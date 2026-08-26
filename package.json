@@ -1,6 +1,6 @@
 {
   "name": "memoryintel",
-  "version": "0.1.2",
+  "version": "1.0.0",
   "description": "Persistent, cross-session project memory for AI coding agents.",
   "type": "module",
   "bin": {

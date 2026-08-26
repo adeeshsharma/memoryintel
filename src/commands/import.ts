@@ -1,14 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { relative } from 'node:path';
 import { runUpdate } from './update.js';
 import { encodeToonTable } from '../core/toon.js';
-
-interface Candidate {
-  file: string;
-  section: string;
-  content: string;
-  sourceLabel: string;
-}
+import { walkFiles, findDocuments, type DocFile } from '../core/repoScan.js';
 
 export interface ImportResult {
   applied: string[];
@@ -16,101 +9,71 @@ export interface ImportResult {
   sourcesFound: string[];
 }
 
-// Cline/Roo/Kilo-Code's memory-bank/ convention (also the exact shape docmanager-axi and
-// reactive-axi's own AGENTS.md files use) - the single highest-confidence brownfield source,
-// because it's already hand-organized project understanding, not raw code to re-derive from.
-const MEMORY_BANK_MAP: { relFile: string; section: string; sourceName: string }[] = [
-  { relFile: 'context/projectBrief.md', section: 'Overview', sourceName: 'projectbrief.md' },
-  { relFile: 'business/productContext.md', section: 'Product Overview', sourceName: 'productContext.md' },
-  { relFile: 'technical/patterns.md', section: 'Design Patterns', sourceName: 'systemPatterns.md' },
-  { relFile: 'technical/techContext.md', section: 'Stack', sourceName: 'techContext.md' },
-  { relFile: 'context/activeContext.md', section: 'Current Focus', sourceName: 'activeContext.md' },
-  { relFile: 'context/progress.md', section: 'Status', sourceName: 'progress.md' }
+// Ordered, first-match-wins keyword -> target mapping. Deliberately just keyword matching on a
+// document's filename + extracted title, not any real understanding of its content - the general
+// replacement for hardcoding a table of known filenames (memory-bank's convention happens to
+// fall out of this for free: "productContext.md" matches "product", "systemPatterns.md" matches
+// "pattern", with no special-casing needed), generalized to any document anywhere in the repo,
+// under any naming convention.
+const ROUTES: { keywords: string[]; file: string; section: string }[] = [
+  { keywords: ['architecture', 'design'], file: 'technical/architecture.md', section: 'Overview' },
+  { keywords: ['pattern'], file: 'technical/patterns.md', section: 'Design Patterns' },
+  { keywords: ['tech', 'stack'], file: 'technical/techContext.md', section: 'Stack' },
+  { keywords: ['integration'], file: 'technical/integrations.md', section: 'External Services' },
+  { keywords: ['infra', 'deploy'], file: 'technical/infrastructure.md', section: 'Deployment' },
+  { keywords: ['product'], file: 'business/productContext.md', section: 'Product Overview' },
+  { keywords: ['roadmap'], file: 'business/roadmap.md', section: 'Now' },
+  { keywords: ['stakeholder', 'team'], file: 'business/stakeholders.md', section: 'Team' },
+  { keywords: ['market'], file: 'business/marketContext.md', section: 'Market Overview' },
+  { keywords: ['progress', 'status'], file: 'context/progress.md', section: 'Status' },
+  { keywords: ['active', 'focus', 'current'], file: 'context/activeContext.md', section: 'Current Focus' },
+  { keywords: ['decision'], file: 'context/decisions.md', section: 'Decisions Log' },
+  { keywords: ['learn'], file: 'context/learnings.md', section: 'Learnings' },
+  { keywords: ['objective', 'goal'], file: 'context/objectives.md', section: 'Objectives' },
+  { keywords: ['hypothes'], file: 'research/hypotheses.md', section: 'Open Hypotheses' },
+  { keywords: ['finding', 'research'], file: 'research/findings.md', section: 'Key Findings' },
+  { keywords: ['reference'], file: 'research/references.md', section: 'Sources' },
+  { keywords: ['readme', 'brief', 'overview'], file: 'context/projectBrief.md', section: 'Overview' }
 ];
+// Anything matching no keyword still lands somewhere a human/agent will see it, rather than
+// being silently dropped for not fitting a known bucket.
+const DEFAULT_ROUTE = { file: 'context/projectBrief.md', section: 'Overview' };
 
-function findCaseInsensitive(dir: string, name: string): string | null {
-  if (!existsSync(dir)) return null;
-  const lower = name.toLowerCase();
-  const match = readdirSync(dir).find((f) => f.toLowerCase() === lower);
-  return match ? join(dir, match) : null;
+function route(doc: DocFile, targetDir: string): { file: string; section: string } {
+  const haystack = `${relative(targetDir, doc.path)} ${doc.title}`.toLowerCase();
+  for (const r of ROUTES) {
+    if (r.keywords.some((k) => haystack.includes(k))) return { file: r.file, section: r.section };
+  }
+  return DEFAULT_ROUTE;
 }
 
-// Deliberately verbatim, not summarized or re-split into finer sections - this command is a
-// mechanical transcription step, not a judgment step. Splitting productContext.md's prose across
-// "Users"/"Value Proposition" would require actually reading and interpreting it, which is
-// exactly the per-project judgment call this command exists to avoid paying for up front.
 function annotate(content: string, sourceLabel: string): string {
   const today = new Date().toISOString().slice(0, 10);
-  return `_Imported verbatim from \`${sourceLabel}\` on ${today} — not yet re-filed into per-section structure; treat as raw source material for the next real update._\n\n${content}`;
-}
-
-// Skips headings, badges, and image lines to find the README's actual opening description -
-// only used as a fallback when memory-bank/projectbrief.md doesn't already cover this ground.
-function firstParagraph(markdown: string): string | null {
-  const paragraphs: string[] = [];
-  let current: string[] = [];
-  for (const rawLine of markdown.split('\n')) {
-    const line = rawLine.trim();
-    if (line === '') {
-      if (current.length > 0) { paragraphs.push(current.join(' ')); current = []; }
-      continue;
-    }
-    if (/^#/.test(line) || /^!?\[/.test(line)) continue;
-    current.push(line);
-  }
-  if (current.length > 0) paragraphs.push(current.join(' '));
-  return paragraphs.find((p) => p.length > 20) ?? null;
+  return `_Imported verbatim from \`${sourceLabel}\` on ${today} — not yet re-filed into per-section structure; treat as raw source material for the next real update._\n\n${content.trim()}`;
 }
 
 export async function runImport(root: string, targetDir: string): Promise<ImportResult> {
-  const candidates: Candidate[] = [];
-  const sourcesFound: string[] = [];
-  const memoryBankDir = join(targetDir, 'memory-bank');
-  let sawProjectBrief = false;
+  const files = walkFiles(targetDir);
+  const docs = findDocuments(targetDir, files);
 
-  for (const entry of MEMORY_BANK_MAP) {
-    const found = findCaseInsensitive(memoryBankDir, entry.sourceName);
-    if (!found) continue;
-    const content = readFileSync(found, 'utf-8').trim();
-    if (!content) continue;
-    const label = `memory-bank/${entry.sourceName}`;
-    sourcesFound.push(label);
-    candidates.push({ file: entry.relFile, section: entry.section, content: annotate(content, label), sourceLabel: label });
-    if (entry.relFile === 'context/projectBrief.md') sawProjectBrief = true;
-  }
-
-  const archPath = findCaseInsensitive(targetDir, 'ARCHITECTURE.md');
-  if (archPath) {
-    const content = readFileSync(archPath, 'utf-8').trim();
-    if (content) {
-      sourcesFound.push('ARCHITECTURE.md');
-      candidates.push({ file: 'technical/architecture.md', section: 'Overview', content: annotate(content, 'ARCHITECTURE.md'), sourceLabel: 'ARCHITECTURE.md' });
-    }
-  }
-
-  if (!sawProjectBrief) {
-    const readmePath = findCaseInsensitive(targetDir, 'README.md');
-    if (readmePath) {
-      const lede = firstParagraph(readFileSync(readmePath, 'utf-8'));
-      if (lede) {
-        sourcesFound.push('README.md');
-        candidates.push({ file: 'context/projectBrief.md', section: 'Overview', content: annotate(lede, 'README.md'), sourceLabel: 'README.md' });
-      }
-    }
-  }
-
-  if (candidates.length === 0) {
+  if (docs.length === 0) {
     return { applied: [], skipped: [], sourcesFound: [] };
   }
 
-  const planText = encodeToonTable(candidates.map((c) => ({
-    file: c.file,
-    action: 'append',
-    section: c.section,
-    content: c.content,
-    reason: `Brownfield import from ${c.sourceLabel}`
-  })));
+  const sourcesFound = docs.map((d) => relative(targetDir, d.path));
+  const candidates = docs.map((doc) => {
+    const target = route(doc, targetDir);
+    const label = relative(targetDir, doc.path);
+    return {
+      file: target.file,
+      action: 'append',
+      section: target.section,
+      content: annotate(doc.content, label),
+      reason: `Brownfield import from ${label}`
+    };
+  });
 
+  const planText = encodeToonTable(candidates);
   const { applied, skipped } = await runUpdate(root, planText);
   return { applied, skipped, sourcesFound };
 }

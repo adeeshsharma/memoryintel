@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { walkFiles, detectStack, buildImportGraph, findDocs } from '../../src/core/repoScan.js';
+import { walkFiles, listTopLevel, detectStack, findDocuments, isDocumentHtml } from '../../src/core/repoScan.js';
 
 let dir: string;
 
@@ -22,6 +21,25 @@ describe('walkFiles', () => {
     expect(files.some((f) => f.includes('node_modules'))).toBe(false);
     expect(files.some((f) => f.includes('.memoryintel'))).toBe(false);
     expect(files.some((f) => f.endsWith('real.ts'))).toBe(true);
+  });
+});
+
+describe('listTopLevel', () => {
+  it('lists immediate children only, marking directories with a trailing slash', () => {
+    mkdirSync(join(dir, 'src'));
+    writeFileSync(join(dir, 'src', 'nested.ts'), '');
+    writeFileSync(join(dir, 'README.md'), '');
+
+    const top = listTopLevel(dir);
+    expect(top).toEqual(['README.md', 'src/']);
+  });
+
+  it('excludes ignored directories', () => {
+    mkdirSync(join(dir, 'node_modules'));
+    mkdirSync(join(dir, '.memoryintel'));
+    writeFileSync(join(dir, 'package.json'), '{}');
+
+    expect(listTopLevel(dir)).toEqual(['package.json']);
   });
 });
 
@@ -66,85 +84,48 @@ describe('detectStack', () => {
   });
 });
 
-describe('buildImportGraph', () => {
-  it('ranks files by how many other files import them', () => {
-    writeFileSync(join(dir, 'shared.ts'), 'export const x = 1;\n');
-    writeFileSync(join(dir, 'a.ts'), "import { x } from './shared.js';\n");
-    writeFileSync(join(dir, 'b.ts'), "import { x } from './shared.js';\n");
-    const files = walkFiles(dir);
-
-    const hubs = buildImportGraph(dir, files);
-    expect(hubs[0].path.endsWith('shared.ts')).toBe(true);
-    expect(hubs[0].importedByCount).toBe(2);
+describe('isDocumentHtml', () => {
+  it('rejects an SPA shell (mount div + script, no prose)', () => {
+    const shell = '<html><body><div id="root"></div><script src="/bundle.js"></script></body></html>';
+    expect(isDocumentHtml(shell)).toBe(false);
   });
 
-  it('resolves a .js specifier to a .ts source file (TS/ESM NodeNext convention)', () => {
-    writeFileSync(join(dir, 'util.ts'), 'export const y = 1;\n');
-    writeFileSync(join(dir, 'main.ts'), "import { y } from './util.js';\n");
-    const files = walkFiles(dir);
-
-    const hubs = buildImportGraph(dir, files);
-    expect(hubs.some((h) => h.path.endsWith('util.ts') && h.importedByCount === 1)).toBe(true);
+  it('rejects HTML with little visible text even without a known mount-div id', () => {
+    expect(isDocumentHtml('<html><body><div class="app"></div></body></html>')).toBe(false);
   });
 
-  it('ignores bare package specifiers (external dependencies, not part of this graph)', () => {
-    writeFileSync(join(dir, 'main.ts'), "import express from 'express';\n");
-    const files = walkFiles(dir);
-    const hubs = buildImportGraph(dir, files);
-    expect(hubs).toEqual([]);
-  });
-
-  it('resolves Python relative imports', () => {
-    mkdirSync(join(dir, 'pkg'), { recursive: true });
-    writeFileSync(join(dir, 'pkg', 'helper.py'), 'X = 1\n');
-    writeFileSync(join(dir, 'pkg', 'main.py'), 'from .helper import X\n');
-    const files = walkFiles(dir);
-
-    const hubs = buildImportGraph(dir, files);
-    expect(hubs.some((h) => h.path.endsWith('helper.py') && h.importedByCount === 1)).toBe(true);
+  it('accepts a real prose-heavy document', () => {
+    const doc = `<html><head><title>Architecture</title></head><body><h1>Architecture</h1><p>${'This system is composed of several services communicating over a queue. '.repeat(5)}</p></body></html>`;
+    expect(isDocumentHtml(doc)).toBe(true);
   });
 });
 
-describe('findDocs', () => {
-  it('excludes root README.md and ARCHITECTURE.md (already covered by import)', () => {
-    writeFileSync(join(dir, 'README.md'), '# Title\n');
-    writeFileSync(join(dir, 'ARCHITECTURE.md'), '# Arch\n');
+describe('findDocuments', () => {
+  it('treats every markdown file as a document, no app-vs-doc distinction needed', () => {
     writeFileSync(join(dir, 'NOTES.md'), '# Notes\nSomething worth knowing.\n');
-    const files = walkFiles(dir);
-
-    const docs = findDocs(dir, files);
-    expect(docs.map((d) => d.path)).toEqual(['NOTES.md']);
+    const docs = findDocuments(dir, walkFiles(dir));
+    expect(docs).toHaveLength(1);
+    expect(docs[0].title).toBe('Notes');
   });
 
-  it('extracts the H1 as title when present, falling back to the first line', () => {
-    writeFileSync(join(dir, 'a.md'), '# Real Title\n\nbody\n');
-    writeFileSync(join(dir, 'b.md'), 'Just a plain first line\n');
-    const files = walkFiles(dir);
-
-    const docs = findDocs(dir, files);
-    const a = docs.find((d) => d.path === 'a.md');
-    const b = docs.find((d) => d.path === 'b.md');
-    expect(a?.title).toBe('Real Title');
-    expect(b?.title).toBe('Just a plain first line');
+  it('excludes an HTML file that looks like an app shell', () => {
+    writeFileSync(join(dir, 'index.html'), '<html><body><div id="root"></div><script src="/main.js"></script></body></html>');
+    const docs = findDocuments(dir, walkFiles(dir));
+    expect(docs).toHaveLength(0);
   });
 
-  it('extracts an HTML <title> tag', () => {
-    writeFileSync(join(dir, 'page.html'), '<html><head><title>My Page</title></head></html>');
-    const files = walkFiles(dir);
-    const docs = findDocs(dir, files);
-    expect(docs[0].title).toBe('My Page');
+  it('includes an HTML file that is a real document', () => {
+    const doc = `<html><head><title>Internals</title></head><body><p>${'A long explanation of how this works. '.repeat(6)}</p></body></html>`;
+    writeFileSync(join(dir, 'internals.html'), doc);
+    const docs = findDocuments(dir, walkFiles(dir));
+    expect(docs).toHaveLength(1);
+    expect(docs[0].title).toBe('Internals');
   });
-});
 
-describe('walkFiles + git churn integration (sanity, not a unit test of git itself)', () => {
-  it('a real git repo can be scanned without throwing', () => {
-    execFileSync('git', ['init'], { cwd: dir });
-    execFileSync('git', ['config', 'user.email', 'a@b.c'], { cwd: dir });
-    execFileSync('git', ['config', 'user.name', 'a'], { cwd: dir });
-    writeFileSync(join(dir, 'x.ts'), 'export {}\n');
-    execFileSync('git', ['add', '.'], { cwd: dir });
-    execFileSync('git', ['commit', '-m', 'init'], { cwd: dir });
-
-    expect(() => walkFiles(dir)).not.toThrow();
+  it('finds documents anywhere in the tree, not just root or a memory-bank/ convention', () => {
+    mkdirSync(join(dir, 'docs', 'deep'), { recursive: true });
+    writeFileSync(join(dir, 'docs', 'deep', 'auth-flow.md'), '# Auth Flow\nHow login works.\n');
+    const docs = findDocuments(dir, walkFiles(dir));
+    expect(docs.some((d) => d.path.endsWith('auth-flow.md'))).toBe(true);
   });
 });

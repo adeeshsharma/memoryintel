@@ -23,10 +23,10 @@ export const USAGE = `Usage: memoryintel <command> [options]
 
 Commands:
   init [path]              Initialize .memoryintel/ in the current or given directory
-  scan [path]              Print a quick, no-LLM digest of an existing codebase (stack,
-                           git churn, import hub files, other docs) - a starting point for
-                           the first real memory-writing pass on a brownfield project
-  import [path]            Pull memory-bank/, ARCHITECTURE.md, README.md into .memoryintel/
+  scan [path]              Print a quick, no-LLM digest of an existing codebase's stack and
+                           top-level layout - orientation only, not architecture
+  import [path]            Pull every real .md/.html document in the repo (not just
+                           memory-bank/-style files) into the matching .memoryintel/ section
   load [--domain <d>]      Print resolved memory context to stdout
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)
   status                   Print a human-readable summary of current memory state

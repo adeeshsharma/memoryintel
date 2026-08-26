@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, relative, extname, basename } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, extname } from 'node:path';
 
 // Common vendor/build/cache directories across the ecosystems this scans (JS/TS, Python, Go,
 // Rust). Not full .gitignore parsing - a real ignore-file parser is its own project, and this
@@ -45,6 +45,21 @@ export function walkFiles(targetDir: string): string[] {
 
   visit(targetDir);
   return results;
+}
+
+// A single level deep, not recursive - "repo/project setup" means "what's here", not a full
+// tree. Directories are listed with a trailing slash so the shape is legible at a glance.
+export function listTopLevel(targetDir: string): string[] {
+  let entries;
+  try {
+    entries = readdirSync(targetDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((e) => !(e.isDirectory() && IGNORED_DIRS.has(e.name)))
+    .map((e) => (e.isDirectory() ? `${e.name}/` : e.name))
+    .sort();
 }
 
 export interface StackInfo {
@@ -148,111 +163,10 @@ export function detectStack(targetDir: string): StackInfo {
   return { manifests, dependencies: [...dependencies], scripts, entryPoints };
 }
 
-const JS_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
-const JS_IMPORT_PATTERN = /(?:import|export)\s+(?:[\w*${},\s]+from\s+)?['"]([^'"]+)['"]|require\(\s*['"]([^'"]+)['"]\s*\)/g;
-const PY_IMPORT_PATTERN = /^\s*from\s+(\.*[\w.]*)\s+import|^\s*import\s+([\w.]+)/gm;
-
-// TypeScript's NodeNext/ESM resolution requires specifiers to name the *compiled* .js file even
-// though the real source is .ts ('./update.js' importing from update.ts) - this project's own
-// codebase does this everywhere. Without this swap, every relative import in a modern TS/ESM
-// project resolves to nothing.
-const COMPILED_TO_SOURCE_EXT: Record<string, string> = { '.js': '.ts', '.jsx': '.tsx', '.mjs': '.mts', '.cjs': '.cts' };
-
-// Only relative specifiers ('./x', '../x') are resolved - a bare package name ('react',
-// 'lodash/fp') is an external dependency, not part of this repo's own file graph.
-function resolveJsImport(fromFile: string, specifier: string, fileSet: Set<string>): string | null {
-  if (!specifier.startsWith('.')) return null;
-  const base = join(dirname(fromFile), specifier);
-  const specExt = extname(specifier);
-  const sourceExt = COMPILED_TO_SOURCE_EXT[specExt];
-  const candidates = [
-    base,
-    ...(sourceExt ? [base.slice(0, -specExt.length) + sourceExt] : []),
-    ...JS_EXTENSIONS.map((ext) => base + ext),
-    ...JS_EXTENSIONS.map((ext) => join(base, 'index' + ext))
-  ];
-  return candidates.find((c) => fileSet.has(c)) ?? null;
-}
-
-// Handles relative imports ('.foo', '..foo.bar') by walking up one directory per leading dot.
-// Absolute intra-repo imports ('mypackage.module') are resolved only via the heuristic that
-// `mypackage` is a real top-level directory containing an `__init__.py` right under targetDir -
-// good enough to catch the common case without needing to understand the project's real import
-// root (src layout, PYTHONPATH, etc.), which a quick scan has no reliable way to know.
-function resolvePyImport(fromFile: string, targetDir: string, specifier: string, fileSet: Set<string>): string | null {
-  if (!specifier) return null;
-
-  if (specifier.startsWith('.')) {
-    const leadingDots = specifier.match(/^\.+/)?.[0].length ?? 1;
-    let dir = dirname(fromFile);
-    for (let i = 1; i < leadingDots; i++) dir = dirname(dir);
-    const rest = specifier.slice(leadingDots);
-    const base = rest ? join(dir, ...rest.split('.')) : dir;
-    return fileSet.has(base + '.py') ? base + '.py'
-      : fileSet.has(join(base, '__init__.py')) ? join(base, '__init__.py')
-      : null;
-  }
-
-  const segments = specifier.split('.');
-  const topLevel = join(targetDir, segments[0]);
-  if (!fileSet.has(join(topLevel, '__init__.py')) && !existsSync(join(topLevel, '__init__.py'))) return null;
-  const base = join(targetDir, ...segments);
-  return fileSet.has(base + '.py') ? base + '.py'
-    : fileSet.has(join(base, '__init__.py')) ? join(base, '__init__.py')
-    : null;
-}
-
-export interface HubFile {
-  path: string;
-  importedByCount: number;
-}
-
-// Ranks files by in-degree in the local import graph - "imported by the most other files" is a
-// cheap, deterministic proxy for "architecturally central", without reading a single file's
-// actual meaning. JS/TS and Python only for v1; a file in any other language is simply never a
-// source of edges (it can still be an edge *target* if something imports it, which won't happen
-// across language boundaries anyway).
-export function buildImportGraph(targetDir: string, files: string[], limit = 15): HubFile[] {
-  const fileSet = new Set(files);
-  const inDegree = new Map<string, Set<string>>();
-
-  const bump = (from: string, to: string): void => {
-    if (!inDegree.has(to)) inDegree.set(to, new Set());
-    inDegree.get(to)!.add(from);
-  };
-
-  for (const file of files) {
-    const ext = extname(file);
-    if (JS_EXTENSIONS.includes(ext)) {
-      let text: string;
-      try { text = readFileSync(file, 'utf-8'); } catch { continue; }
-      for (const match of text.matchAll(JS_IMPORT_PATTERN)) {
-        const specifier = match[1] ?? match[2];
-        if (!specifier) continue;
-        const resolved = resolveJsImport(file, specifier, fileSet);
-        if (resolved && resolved !== file) bump(file, resolved);
-      }
-    } else if (ext === '.py') {
-      let text: string;
-      try { text = readFileSync(file, 'utf-8'); } catch { continue; }
-      for (const match of text.matchAll(PY_IMPORT_PATTERN)) {
-        const specifier = match[1] ?? match[2];
-        if (!specifier) continue;
-        const resolved = resolvePyImport(file, targetDir, specifier, fileSet);
-        if (resolved && resolved !== file) bump(file, resolved);
-      }
-    }
-  }
-
-  return [...inDegree.entries()]
-    .map(([path, importers]) => ({ path, importedByCount: importers.size }))
-    .sort((a, b) => b.importedByCount - a.importedByCount)
-    .slice(0, limit);
-}
-
 export interface DocFile {
   path: string;
   title: string;
+  content: string;
 }
 
 function extractMarkdownTitle(text: string): string {
@@ -270,33 +184,75 @@ function extractHtmlTitle(text: string): string {
   return '(untitled)';
 }
 
+// SPA shells (a React/Vue/etc. app's index.html) are markup with almost no prose: a mount div
+// and a script tag. A real document is prose-heavy. Neither signal alone is reliable (a tiny
+// real doc could dip under the text threshold; a doc-heavy landing page could avoid the mount-div
+// markers) but together they cover the common cases without needing to know any framework by name.
+const SPA_SHELL_MARKERS = /id=["'](root|app|__next|__nuxt)["']/i;
+const MIN_DOCUMENT_TEXT_LENGTH = 150;
+
+function visibleText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isDocumentHtml(html: string): boolean {
+  if (SPA_SHELL_MARKERS.test(html)) return false;
+  return visibleText(html).length >= MIN_DOCUMENT_TEXT_LENGTH;
+}
+
+// True if anything survives once every heading line is stripped out - a file that's only
+// headings (a bare `init` starter section, or a title-only stub) has no actual information.
+function hasMarkdownBody(content: string): boolean {
+  return content
+    .split('\n')
+    .filter((line) => !/^#+\s/.test(line.trim()))
+    .some((line) => line.trim().length > 0);
+}
+
 const DOC_EXTENSIONS = new Set(['.md', '.markdown', '.html', '.htm']);
-// import already handles these at the project root verbatim - listing them again here would
-// just be noise, not a new signal.
-const ALREADY_COVERED = new Set(['readme.md', 'architecture.md']);
 
-export function findDocs(targetDir: string, files: string[], limit = 30): DocFile[] {
-  const candidates = files
-    .filter((f) => DOC_EXTENSIONS.has(extname(f).toLowerCase()))
-    .filter((f) => {
-      const rel = relative(targetDir, f);
-      const isRoot = !rel.includes('/') && !rel.includes('\\');
-      return !(isRoot && ALREADY_COVERED.has(basename(f).toLowerCase()));
-    });
+// The genericPointer adapter (src/adapters/genericPointer.ts) upserts this managed block into
+// AGENTS.md/GEMINI.md - it's memoryintel's own boilerplate, not project documentation. A file
+// that already had real content keeps it and the block is just noise mixed in; a fresh stub file
+// created by `init` with nothing but this block has zero real information and must not be
+// imported as if it described the project (worst case: a brand-new stub's entire content is
+// "this project uses Memory Intel, run `memoryintel load`", which would land in projectBrief.md
+// looking like the project's own description).
+const MANAGED_BLOCK_PATTERN = /<!-- memoryintel:managed:start -->[\s\S]*?<!-- memoryintel:managed:end -->/g;
 
-  const withMtime = candidates.map((f) => {
-    let mtimeMs = 0;
-    try { mtimeMs = statSync(f).mtimeMs; } catch { /* keep 0, sorts last */ }
-    return { path: f, mtimeMs };
-  });
+// Every real document (not app markup, not memoryintel's own managed content) anywhere under
+// targetDir - the general replacement for hardcoding a table of known filenames like
+// memory-bank's convention. A markdown file is always a document (there's no equivalent "app
+// shell" concept for markdown); an HTML file has to pass isDocumentHtml first.
+export function findDocuments(targetDir: string, files: string[]): DocFile[] {
+  const results: DocFile[] = [];
 
-  withMtime.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  for (const file of files) {
+    const ext = extname(file).toLowerCase();
+    if (!DOC_EXTENSIONS.has(ext)) continue;
 
-  return withMtime.slice(0, limit).map(({ path }) => {
-    let text = '';
-    try { text = readFileSync(path, 'utf-8'); } catch { /* leave empty, title falls back */ }
-    const ext = extname(path).toLowerCase();
-    const title = ext === '.html' || ext === '.htm' ? extractHtmlTitle(text) : extractMarkdownTitle(text);
-    return { path: relative(targetDir, path), title };
-  });
+    let content: string;
+    try { content = readFileSync(file, 'utf-8'); } catch { continue; }
+    content = content.replace(MANAGED_BLOCK_PATTERN, '').trim();
+    if (!content) continue;
+
+    if (ext === '.html' || ext === '.htm') {
+      if (!isDocumentHtml(content)) continue;
+      results.push({ path: file, title: extractHtmlTitle(content), content: visibleText(content) });
+    } else if (!hasMarkdownBody(content)) {
+      // A file that's nothing but a heading (a bare `init` starter section, or an AGENTS.md
+      // stub reduced to just its "# Project Instructions" title once the managed block above is
+      // stripped) has no real information - importing it would be pure noise, not source material.
+      continue;
+    } else {
+      results.push({ path: file, title: extractMarkdownTitle(content), content });
+    }
+  }
+
+  return results;
 }

@@ -1,0 +1,52 @@
+{
+  "name": "memoryintel",
+  "version": "0.1.2",
+  "description": "Persistent, cross-session project memory for AI coding agents.",
+  "type": "module",
+  "bin": {
+    "memoryintel": "./dist/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adeeshsharma/memoryintel.git"
+  },
+  "homepage": "https://github.com/adeeshsharma/memoryintel#readme",
+  "bugs": {
+    "url": "https://github.com/adeeshsharma/memoryintel/issues"
+  },
+  "author": {
+    "name": "Adeesh Sharma",
+    "url": "https://github.com/adeeshsharma"
+  },
+  "keywords": [
+    "ai-agent",
+    "claude-code",
+    "cli",
+    "memory",
+    "context",
+    "skill",
+    "mcp"
+  ],
+  "license": "MIT",
+  "files": [
+    "dist",
+    "skills",
+    ".claude-plugin",
+    "hooks"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/build-skill.js && node scripts/ensure-executable.mjs",
+    "build:skill": "node scripts/build-skill.js",
+    "build:skill:check": "node scripts/build-skill.js --check",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

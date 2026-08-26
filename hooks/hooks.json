@@ -1,0 +1,11 @@
+{
+  "description": "Load and maintain persistent project memory automatically",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "npx -y memoryintel load" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "npx -y memoryintel check-stop" }] }
+    ]
+  }
+}

@@ -1,0 +1,997 @@
+<title>Memory Intel Internals</title>
+<style>
+  :root {
+    --bg: #F4F5F2;
+    --surface: #FFFFFF;
+    --ink: #191D1A;
+    --muted: #5A625C;
+    --accent: #2E6E5E;
+    --accent-ink: #14332B;
+    --accent-soft: #DCEAE5;
+    --border: rgba(25, 29, 26, 0.14);
+    --code-bg: #171D19;
+    --code-ink: #E7ECE8;
+    --code-muted: #93A099;
+    --shadow: 0 1px 2px rgba(25, 29, 26, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10130F;
+      --surface: #171C18;
+      --ink: #E7ECE8;
+      --muted: #8FA097;
+      --accent: #6FBFA8;
+      --accent-ink: #DCEAE5;
+      --accent-soft: rgba(111, 191, 168, 0.16);
+      --border: rgba(231, 236, 232, 0.16);
+      --code-bg: #0B0E0B;
+      --code-ink: #DCE5DF;
+      --code-muted: #7C9088;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10130F;
+    --surface: #171C18;
+    --ink: #E7ECE8;
+    --muted: #8FA097;
+    --accent: #6FBFA8;
+    --accent-ink: #DCEAE5;
+    --accent-soft: rgba(111, 191, 168, 0.16);
+    --border: rgba(231, 236, 232, 0.16);
+    --code-bg: #0B0E0B;
+    --code-ink: #DCE5DF;
+    --code-muted: #7C9088;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 24px 120px;
+  }
+
+  h1, h2, h3 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    line-height: 1.15;
+    text-wrap: balance;
+    color: var(--ink);
+    margin: 0;
+  }
+
+  .wrap { max-width: 800px; margin: 0 auto; }
+  .wide { max-width: 940px; margin: 0 auto; }
+
+  header.doc-head {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  header.doc-head h1 { font-size: 42px; margin-bottom: 16px; }
+  header.doc-head p.dek {
+    font-size: 19px;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0;
+  }
+
+  section { padding: 56px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  section > .wrap > .eyebrow, section > .wide > .eyebrow { margin-bottom: 10px; }
+  section h2 { font-size: 28px; margin-bottom: 8px; }
+  section p.lede { font-size: 17px; color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
+
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p:last-child { margin-bottom: 0; }
+
+  code, .mono {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.88em;
+  }
+  code {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13.5px;
+    line-height: 1.6;
+    padding: 18px 20px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 0 0 20px;
+  }
+  pre .c { color: var(--code-muted); }
+  pre code { background: none; color: inherit; padding: 0; border-radius: 0; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  .diagram-frame {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    overflow-x: auto;
+    margin: 0 0 12px;
+  }
+  figure { margin: 0 0 40px; }
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  figcaption {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 12px;
+    max-width: 68ch;
+  }
+  figcaption .mono { color: var(--ink); }
+
+  .diagram-text { font-family: "IBM Plex Mono", monospace; }
+  .diagram-label { font-family: "IBM Plex Sans", sans-serif; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  td.mono { font-family: "IBM Plex Mono", monospace; font-size: 13px; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .table-wrap table { margin: 0; }
+  .table-wrap tr:last-child td { border-bottom: none; }
+
+  .tree {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13.5px;
+    line-height: 1.7;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: 20px 24px;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .tree .dir { color: var(--accent); }
+  .tree .note { color: var(--code-muted); }
+
+  .journey {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .journey-row { display: contents; }
+  .journey-phase {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    padding: 22px 16px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  }
+  .journey-body { padding: 20px 24px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .journey-row:last-child .journey-phase,
+  .journey-row:last-child .journey-body { border-bottom: none; }
+  .journey-col h4 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+  .journey-col p { font-size: 14.5px; margin: 0; color: var(--ink); }
+  .journey-col p + p { margin-top: 8px; }
+
+  .callout {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    font-size: 14.5px;
+    margin: 0 0 20px;
+  }
+  .callout strong { color: var(--accent-ink); }
+
+  footer.doc-foot {
+    max-width: 800px;
+    margin: 56px auto 0;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    header.doc-head h1 { font-size: 32px; }
+    .journey { grid-template-columns: 1fr; }
+    .journey-phase { border-right: none; }
+    .journey-body { grid-template-columns: 1fr; }
+  }
+
+  .matrix th, .matrix td { font-size: 13.5px; }
+  .matrix th.tool { font-family: "Fraunces", Georgia, serif; font-size: 15px; text-transform: none; letter-spacing: 0; color: var(--ink); font-weight: 600; }
+  .matrix th.tool.self { color: var(--accent); }
+  .matrix td.dim { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .cap { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; white-space: nowrap; }
+  .cap-yes { color: var(--accent); font-weight: 600; }
+  .cap-yes::before { content: "● "; }
+  .cap-partial { color: var(--ink); opacity: 0.75; }
+  .cap-partial::before { content: "◐ "; }
+  .cap-no { color: var(--muted); opacity: 0.55; }
+  .cap-no::before { content: "○ "; }
+  .cap-note { display: block; font-family: "IBM Plex Sans", sans-serif; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: normal; }
+
+  .verdict-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+  .verdict-card { padding: 20px 22px; }
+  .verdict-card h4 { font-family: "Fraunces", Georgia, serif; font-size: 17px; margin: 0 0 10px; }
+  .verdict-card.complement { border-left: 3px solid var(--accent); }
+  .verdict-card.friction { border-left: 3px solid var(--muted); }
+  .verdict-card p { font-size: 14px; margin: 0 0 8px; }
+  .verdict-card p:last-child { margin-bottom: 0; }
+  @media (max-width: 640px) { .verdict-grid { grid-template-columns: 1fr; } }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<header class="doc-head">
+  <p class="eyebrow">Memory Intel — internals reference</p>
+  <h1>How Memory Intel actually works</h1>
+  <p class="dek">A ground-level map of the files, commands, and hooks behind Memory Intel — what runs when, what it touches on disk, and what a person and their agent each experience along the way.</p>
+</header>
+
+<section id="overview">
+  <div class="wrap">
+    <p class="eyebrow">Overview</p>
+    <h2>One command, then nothing to remember</h2>
+    <p class="lede">Memory Intel keeps an AI coding agent's understanding of a project alive across sessions — a running "mental model," decisions, architecture notes — without asking anyone to maintain it by hand.</p>
+    <p>The whole system rests on one deliberate rule: a person runs <code>memoryintel init</code> once, in chat, when they decide a project deserves persistent memory. Everything after that — loading context at the start of a session, deciding whether anything worth remembering happened, writing it down — is the agent's job, triggered automatically, never typed by a person again.</p>
+    <p>Three pieces make that possible, and each shows up again in every diagram below: the <strong>CLI</strong> (<code>memoryintel</code>, run via <code>npx</code>, no install required) does all the real file work; the <strong>skill</strong> (<code>skills/memory-intel/SKILL.md</code>) tells an agent when to reach for the CLI and in what words; the <strong>plugin hooks</strong> (<code>hooks/hooks.json</code>) fire the CLI automatically at the start and end of every turn, in every project, without ever touching that project's own configuration.</p>
+  </div>
+</section>
+
+<section id="concepts">
+  <div class="wide">
+    <p class="eyebrow">Concepts</p>
+    <h2>Skill, slash command, hook, plugin — which is which</h2>
+    <p class="lede">Four different Claude Code mechanisms, easy to blur together because they all live inside the same install. Only one of them is "a thing that decides to run" — the other three are about <em>how</em> and <em>when</em>, not who decides.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th style="width:130px;">Mechanism</th><th>Who triggers it</th><th>Lives in</th><th>Memory Intel uses it?</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">Skill</td>
+            <td>The model's own judgment — it reads the skill's <code>description</code> and decides, from what's actually being said in chat, whether this is what the person means.</td>
+            <td class="mono">skills/&lt;name&gt;/SKILL.md</td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">the only entry point — a person never types anything memory-intel-specific</span></td>
+          </tr>
+          <tr>
+            <td class="mono">Slash command</td>
+            <td>A person, typing <code>/something</code> on purpose. Nothing runs unless that exact command is typed.</td>
+            <td class="mono">commands/&lt;name&gt;.md</td>
+            <td><span class="cap cap-no">No, deliberately</span><span class="cap-note">no <code>commands/</code> directory exists in this package at all</span></td>
+          </tr>
+          <tr>
+            <td class="mono">Hook</td>
+            <td>A fixed lifecycle event — <code>SessionStart</code>, <code>Stop</code>, and others. Fires every time that event happens, unconditionally; no model judgment in whether it runs, only in what the agent does with what it outputs.</td>
+            <td class="mono">hooks/hooks.json (plugin-wide) — or a project's own .claude/settings.json</td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">via the plugin's hooks.json only — see the callout below</span></td>
+          </tr>
+          <tr>
+            <td class="mono">Plugin</td>
+            <td>Not a trigger at all — an install/packaging unit. Installing one makes everything it bundles (skills, hooks, commands, more) active, in one step.</td>
+            <td class="mono">.claude-plugin/plugin.json marks the package root</td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">the container that ships the skill and the hooks together</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:24px;">Put together: installing the <strong>memory-intel plugin</strong> is one step that hands Claude Code two things — a <strong>skill</strong> it can match against a request like "set up persistent memory here," and two <strong>hooks</strong> that run automatically in every project from then on. There is no slash command anywhere in this design, and no per-project hook setup either.</p>
+
+    <div class="callout">
+      <strong>Why a hook, and not just the skill alone?</strong> A skill only runs if the model decides to reach for it — reasonable for a one-time ask like "set up memory," risky for something that must happen at the start of <em>every single session</em> without fail. Loading context and nudging the agent when a diff goes unaccounted for are both promises Memory Intel can't leave to the model's discretion turn after turn, so those two are hooks, not skill judgment calls.
+    </div>
+
+    <div class="callout">
+      <strong>Why a plugin's <span class="mono">hooks.json</span>, and not each project's own <span class="mono">.claude/settings.json</span>?</strong> Both can register the same hooks — the difference is where the config lives and who owns it. Writing into a project's <code>.claude/settings.json</code> means every teammate's checkout needs it written (or committed and hoped to merge cleanly), and it's foreign config a general-purpose tool has no business mutating on a project's behalf. A plugin-level <code>hooks.json</code> registers once, for this machine, and applies to every project automatically — <code>init</code> never touches a project's own settings file at all. This was an explicit design change partway through this project (see <span class="mono">docs/superpowers/specs/2026-08-21-plugin-level-hooks-design.md</span>), made for exactly this reason.
+    </div>
+
+    <p>And why no slash command? Early on, this project considered one — <code>/memory-intel init</code>, typed by a person. It was dropped in favor of matching plain language instead (following the same pattern <a href="https://github.com/Graphify-Labs/graphify">graphify</a> uses): a person says "set up persistent memory" in whatever words come naturally, the skill's description matches that intent, and nothing project-specific has to be memorized or typed correctly. The CLI commands underneath (<code>init</code>, <code>load</code>, <code>update</code>, …) still exist — they're just run by the agent via the skill, never typed by a person directly.</p>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="wide">
+    <p class="eyebrow">Architecture</p>
+    <h2>Where each piece lives, and who it talks to</h2>
+    <p class="lede">Three zones: the current project's own <code>.memoryintel/</code>, the machine-wide state under <code>~/.memoryintel/</code> shared by every project, and the plugin that wires the two together.</p>
+
+    <div class="diagram-frame">
+      <figure>
+        <svg viewBox="0 0 920 560" role="img" aria-label="Architecture diagram showing the agent chat calling the CLI, which reads and writes a project's .memoryintel folder, opportunistically talks to a global registry and dashboard daemon shared across all projects, while Claude Code's plugin hooks trigger the CLI automatically and other tools rely on pointer files instead.">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+          <style>
+            .box { fill: none; stroke: currentColor; stroke-width: 1.3; }
+            .box-accent { fill: none; stroke: #2E6E5E; stroke-width: 1.6; }
+            .lbl { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; fill: currentColor; }
+            .lbl-b { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; fill: currentColor; }
+            .mono { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; fill: currentColor; }
+            .arrow-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; fill: currentColor; }
+            .zone-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.08em; fill: currentColor; opacity: 0.55; }
+            .edge { stroke: currentColor; stroke-width: 1.2; fill: none; }
+            .edge-accent { stroke: #2E6E5E; stroke-width: 1.6; fill: none; }
+          </style>
+
+          <!-- Zone: chat -->
+          <rect x="16" y="16" width="888" height="90" rx="8" class="box" stroke-dasharray="3,4" opacity="0.5"></rect>
+          <text x="30" y="34" class="zone-lbl">AGENT CHAT SESSION</text>
+
+          <rect x="40" y="46" width="150" height="48" rx="8" class="box"></rect>
+          <text x="115" y="66" class="lbl-b" text-anchor="middle">Person</text>
+          <text x="115" y="82" class="lbl" text-anchor="middle" opacity="0.7">asks in chat</text>
+
+          <rect x="250" y="46" width="180" height="48" rx="8" class="box"></rect>
+          <text x="340" y="66" class="lbl-b" text-anchor="middle">Agent</text>
+          <text x="340" y="82" class="lbl" text-anchor="middle" opacity="0.7">Claude Code, Cursor, …</text>
+
+          <rect x="500" y="46" width="220" height="48" rx="8" class="box-accent"></rect>
+          <text x="610" y="66" class="lbl-b" text-anchor="middle">memory-intel skill</text>
+          <text x="610" y="82" class="mono" text-anchor="middle" opacity="0.75">SKILL.md</text>
+
+          <line x1="190" y1="70" x2="248" y2="70" class="edge" marker-end="url(#arrow)"></line>
+          <text x="219" y="63" class="arrow-lbl" text-anchor="middle">asks</text>
+          <line x1="430" y1="70" x2="498" y2="70" class="edge-accent" marker-end="url(#arrow)"></line>
+          <text x="464" y="63" class="arrow-lbl" text-anchor="middle">matches</text>
+
+          <!-- CLI -->
+          <rect x="330" y="150" width="260" height="56" rx="8" class="box-accent"></rect>
+          <text x="460" y="174" class="lbl-b" text-anchor="middle">memoryintel CLI</text>
+          <text x="460" y="192" class="mono" text-anchor="middle" opacity="0.75">npx -y memoryintel &lt;cmd&gt;</text>
+
+          <line x1="610" y1="94" x2="470" y2="148" class="edge-accent" marker-end="url(#arrow)"></line>
+          <text x="575" y="120" class="arrow-lbl" text-anchor="middle">runs via Bash</text>
+
+          <!-- Zone: project -->
+          <rect x="16" y="240" width="560" height="300" rx="8" class="box" opacity="0.6"></rect>
+          <text x="30" y="258" class="zone-lbl">THIS PROJECT</text>
+
+          <rect x="40" y="278" width="230" height="60" rx="8" class="box"></rect>
+          <text x="155" y="302" class="lbl-b" text-anchor="middle">.memoryintel/</text>
+          <text x="155" y="320" class="lbl" text-anchor="middle" opacity="0.7">context, technical, …</text>
+
+          <rect x="300" y="278" width="250" height="60" rx="8" class="box"></rect>
+          <text x="425" y="302" class="lbl-b" text-anchor="middle">Pointer files</text>
+          <text x="425" y="320" class="mono" text-anchor="middle" opacity="0.75">AGENTS.md · .cursor/rules</text>
+
+          <line x1="400" y1="206" x2="180" y2="276" class="edge" marker-end="url(#arrow)"></line>
+          <text x="255" y="248" class="arrow-lbl" text-anchor="middle">reads / writes</text>
+          <line x1="420" y1="206" x2="420" y2="276" class="edge" marker-end="url(#arrow)"></line>
+          <text x="430" y="248" class="arrow-lbl">installed once by init</text>
+
+          <rect x="40" y="378" width="510" height="60" rx="8" class="box"></rect>
+          <text x="295" y="402" class="lbl-b" text-anchor="middle">Project's own git repository</text>
+          <text x="295" y="420" class="mono" text-anchor="middle" opacity="0.75">git status --porcelain</text>
+
+          <line x1="155" y1="338" x2="155" y2="376" class="edge" marker-end="url(#arrow)"></line>
+
+          <rect x="40" y="470" width="510" height="50" rx="8" class="box" stroke-dasharray="3,4" opacity="0.7"></rect>
+          <text x="295" y="500" class="lbl" text-anchor="middle" opacity="0.8">Claude Code / Cursor / Codex / Gemini CLI / opencode</text>
+
+          <!-- Zone: machine-wide -->
+          <rect x="620" y="240" width="284" height="300" rx="8" class="box" opacity="0.6"></rect>
+          <text x="634" y="258" class="zone-lbl">THIS MACHINE (SHARED)</text>
+
+          <rect x="644" y="278" width="236" height="60" rx="8" class="box"></rect>
+          <text x="762" y="302" class="lbl-b" text-anchor="middle">~/.memoryintel/</text>
+          <text x="762" y="320" class="mono" text-anchor="middle" opacity="0.75">registry.json · settings.json</text>
+
+          <line x1="590" y1="180" x2="762" y2="276" class="edge" marker-end="url(#arrow)"></line>
+          <text x="700" y="222" class="arrow-lbl" text-anchor="middle">best-effort, every call</text>
+
+          <rect x="644" y="378" width="236" height="60" rx="8" class="box"></rect>
+          <text x="762" y="402" class="lbl-b" text-anchor="middle">Dashboard daemon</text>
+          <text x="762" y="420" class="mono" text-anchor="middle" opacity="0.75">localhost, read-only</text>
+
+          <line x1="762" y1="338" x2="762" y2="376" class="edge" marker-end="url(#arrow)"></line>
+          <text x="772" y="360" class="arrow-lbl">spawns if missing</text>
+
+          <rect x="644" y="470" width="236" height="50" rx="8" class="box" stroke-dasharray="3,4" opacity="0.7"></rect>
+          <text x="762" y="500" class="lbl" text-anchor="middle" opacity="0.8">Every other initialized project</text>
+          <line x1="762" y1="438" x2="762" y2="468" class="edge" marker-end="url(#arrow)"></line>
+          <text x="772" y="458" class="arrow-lbl">lists all of them</text>
+
+          <!-- plugin hooks, cross-cutting -->
+          <rect x="20" y="546" width="880" height="0" opacity="0"></rect>
+        </svg>
+      </figure>
+      <figcaption>The CLI is the only thing that touches disk. Everything else — the skill, the plugin hooks, the dashboard — exists to decide <span class="mono">when</span> the CLI runs, never to duplicate what it does.</figcaption>
+    </div>
+
+    <div class="callout">
+      <strong>The hooks aren't in this diagram because they aren't a component the CLI talks to</strong> — they're a second, independent way the CLI gets invoked. Once the memory-intel <em>plugin</em> is installed, its <code>hooks/hooks.json</code> runs <code>npx -y memoryintel load</code> at the start of every session and <code>npx -y memoryintel check-stop</code> at the end of every turn, in every project, with zero project-level configuration. No project's own <code>.claude/settings.json</code> is ever written.
+    </div>
+  </div>
+</section>
+
+<section id="filemap">
+  <div class="wide">
+    <p class="eyebrow">File map</p>
+    <h2>What <code>memoryintel init</code> actually creates</h2>
+    <p class="lede">Every file below is created once, then only ever appended to or replaced in place — <code>init</code> never overwrites something that already exists, on a first run or the fiftieth.</p>
+
+    <div class="tree">.memoryintel/
+├── <span class="dir">context/</span>
+│   ├── currentMentalModel.md   <span class="note">← the one file update() always fully replaces</span>
+│   ├── activeContext.md
+│   ├── projectBrief.md
+│   ├── objectives.md
+│   ├── decisions.md
+│   ├── progress.md
+│   └── learnings.md
+├── <span class="dir">technical/</span>
+│   ├── architecture.md
+│   ├── techContext.md
+│   ├── patterns.md
+│   ├── integrations.md
+│   └── infrastructure.md
+├── <span class="dir">business/</span>
+│   ├── productContext.md · roadmap.md · stakeholders.md · marketContext.md
+├── <span class="dir">research/</span>
+│   ├── findings.md · references.md · hypotheses.md
+├── <span class="dir">intelligence/</span>            <span class="note">← empty stubs, reserved for the future knowledge-graph phase</span>
+│   ├── entities.json · relationships.json · metadata.json
+├── instructions.md             <span class="note">← the per-project rulebook an agent reads first</span>
+├── memory-config.json          <span class="note">← optional compression.defaultCeilingLines / domainOverrides</span>
+├── memory-index.json           <span class="note">← last-updated timestamp + summary, per file</span>
+├── memory-events.jsonl         <span class="note">← append-only audit log, one line per change</span>
+└── .session-marker.json        <span class="note">← the Stop-hook nudge's own bookkeeping</span></div>
+
+    <div class="table-wrap" style="margin-top:28px;">
+      <table>
+        <thead>
+          <tr><th>File touched</th><th>Written by</th><th>When</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">every file above</td><td>CLI · <code>init</code></td><td>Once, the first time a project opts in. Missing files are added back on any later re-run — an upgrade path, not a reset.</td></tr>
+          <tr><td class="mono">context/*.md · technical/*.md · business/*.md · research/*.md</td><td>CLI · <code>update</code></td><td>Only when an agent decides something meaningful changed. Section-addressed by heading name — an unrecognized heading is rejected, not guessed at.</td></tr>
+          <tr><td class="mono">context/currentMentalModel.md</td><td>CLI · <code>update</code></td><td>Fully replaced, never section-edited — it represents a single current understanding, not a history.</td></tr>
+          <tr><td class="mono">any file <code>load</code> flags <code>status: over</code></td><td>CLI · <code>update</code> (<code>kind: compress</code>)</td><td>Same write path as any other update, gated on the target file being git-clean first. See <a href="#self-compression">Self-compression</a>.</td></tr>
+          <tr><td class="mono">memory-index.json · memory-events.jsonl</td><td>CLI · <code>update</code></td><td>One entry per file actually written or skipped, every <code>update</code> call.</td></tr>
+          <tr><td class="mono">.session-marker.json</td><td>CLI · <code>check-stop</code>, <code>update</code></td><td>Every turn (records what was last flagged) and every successful <code>update</code> (records what's now accounted for).</td></tr>
+          <tr><td class="mono">AGENTS.md · GEMINI.md · .cursor/rules/memoryintel.mdc</td><td>CLI · <code>init</code></td><td>Once, for tools without a native hook system — a pointer to <code>instructions.md</code>, nothing more.</td></tr>
+          <tr><td class="mono">~/.memoryintel/registry.json</td><td>CLI · <code>load</code>, <code>update</code></td><td>Every call, best-effort — records this project's last-seen time for the dashboard.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="init-sequence">
+  <div class="wide">
+    <p class="eyebrow">Command sequence — one time</p>
+    <h2>Bootstrapping a project</h2>
+    <p class="lede">The only step a person's request ever triggers directly. Everything after this section happens without anyone asking.</p>
+
+    <div class="diagram-frame">
+      <figure>
+        <svg viewBox="0 0 900 320" role="img" aria-label="Sequence diagram: person asks agent to set up memory, agent invokes the skill which runs npx memoryintel init, the CLI scaffolds the project's .memoryintel folder and writes pointer files for other tools, then reports back.">
+          <defs>
+            <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+          <style>
+            .lane { stroke: currentColor; stroke-width: 1; opacity: 0.35; }
+            .lane-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 12px; fill: currentColor; font-weight: 500; }
+            .msg { stroke: currentColor; stroke-width: 1.3; fill: none; }
+            .msg-lbl { font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; fill: currentColor; }
+            .step-n { font-family: 'IBM Plex Mono', monospace; font-size: 11px; fill: #2E6E5E; font-weight: 600; }
+          </style>
+
+          <text x="70" y="28" class="lane-lbl" text-anchor="middle">Person</text>
+          <line x1="70" y1="40" x2="70" y2="300" class="lane"></line>
+
+          <text x="250" y="28" class="lane-lbl" text-anchor="middle">Agent + skill</text>
+          <line x1="250" y1="40" x2="250" y2="300" class="lane"></line>
+
+          <text x="470" y="28" class="lane-lbl" text-anchor="middle">memoryintel init</text>
+          <line x1="470" y1="40" x2="470" y2="300" class="lane"></line>
+
+          <text x="700" y="28" class="lane-lbl" text-anchor="middle">.memoryintel/ + pointer files</text>
+          <line x1="700" y1="40" x2="700" y2="300" class="lane"></line>
+
+          <text x="20" y="66" class="step-n">1</text>
+          <line x1="70" y1="70" x2="248" y2="70" class="msg" marker-end="url(#arrow2)"></line>
+          <text x="160" y="63" class="msg-lbl" text-anchor="middle">"set up persistent memory"</text>
+
+          <text x="20" y="106" class="step-n">2</text>
+          <line x1="250" y1="110" x2="468" y2="110" class="msg" marker-end="url(#arrow2)"></line>
+          <text x="360" y="103" class="msg-lbl" text-anchor="middle">npx -y memoryintel init</text>
+
+          <text x="20" y="146" class="step-n">3</text>
+          <line x1="470" y1="150" x2="698" y2="150" class="msg" marker-end="url(#arrow2)"></line>
+          <text x="584" y="143" class="msg-lbl" text-anchor="middle">scaffold context/technical/business/research/intelligence</text>
+
+          <text x="20" y="186" class="step-n">4</text>
+          <line x1="470" y1="190" x2="698" y2="190" class="msg" marker-end="url(#arrow2)"></line>
+          <text x="584" y="183" class="msg-lbl" text-anchor="middle">write instructions.md, memory-config.json, empty index + log</text>
+
+          <text x="20" y="226" class="step-n">5</text>
+          <line x1="470" y1="230" x2="698" y2="230" class="msg" marker-end="url(#arrow2)"></line>
+          <text x="584" y="223" class="msg-lbl" text-anchor="middle">write AGENTS.md / GEMINI.md / .cursor rules (idempotent)</text>
+
+          <text x="20" y="266" class="step-n">6</text>
+          <line x1="470" y1="270" x2="252" y2="270" class="msg" marker-end="url(#arrow2)"></line>
+          <text x="360" y="263" class="msg-lbl" text-anchor="middle">done — nothing left to remember</text>
+        </svg>
+      </figure>
+      <figcaption>Steps 3–5 are idempotent: re-running <span class="mono">init</span> on an already-set-up project only fills in whatever's missing. Step 5 is skipped entirely for Claude Code — its automation comes from the plugin's hooks, not from a file <span class="mono">init</span> writes.</figcaption>
+    </div>
+  </div>
+</section>
+
+<section id="session-sequence">
+  <div class="wide">
+    <p class="eyebrow">Command sequence — every session</p>
+    <h2>What runs without anyone asking</h2>
+    <p class="lede">Once the memory-intel plugin is installed, this whole sequence is automatic. <code>SessionStart</code> fires once; <code>Stop</code> fires after <em>every</em> turn, which is why the nudge only fires once per distinct unresolved change. Step 2's manifest also carries each file's line count against a configurable ceiling — see <a href="#self-compression">Self-compression</a> below for what an agent does when one crosses it.</p>
+
+    <div class="diagram-frame">
+      <figure>
+        <svg viewBox="0 0 900 520" role="img" aria-label="Sequence diagram across a session: SessionStart hook loads context once, the agent works across several turns, the Stop hook fires every turn and checks git status, blocking once when a new uncommitted diff appears and staying quiet on repeats, until the agent runs update which writes memory files and resolves the nudge.">
+          <defs>
+            <marker id="arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+          <style>
+            .lane { stroke: currentColor; stroke-width: 1; opacity: 0.35; }
+            .lane-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 12px; fill: currentColor; font-weight: 500; }
+            .msg { stroke: currentColor; stroke-width: 1.3; fill: none; }
+            .msg-accent { stroke: #2E6E5E; stroke-width: 1.6; fill: none; }
+            .msg-lbl { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; fill: currentColor; }
+            .step-n { font-family: 'IBM Plex Mono', monospace; font-size: 11px; fill: #2E6E5E; font-weight: 600; }
+            .phase { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; fill: currentColor; opacity: 0.55; }
+            .loopbox { fill: none; stroke: currentColor; stroke-width: 1; stroke-dasharray: 3,4; opacity: 0.45; }
+          </style>
+
+          <text x="70" y="28" class="lane-lbl" text-anchor="middle">Claude Code</text>
+          <line x1="70" y1="40" x2="70" y2="500" class="lane"></line>
+
+          <text x="270" y="28" class="lane-lbl" text-anchor="middle">memoryintel CLI</text>
+          <line x1="270" y1="40" x2="270" y2="500" class="lane"></line>
+
+          <text x="470" y="28" class="lane-lbl" text-anchor="middle">Project git repo</text>
+          <line x1="470" y1="40" x2="470" y2="500" class="lane"></line>
+
+          <text x="680" y="28" class="lane-lbl" text-anchor="middle">.memoryintel/ files</text>
+          <line x1="680" y1="40" x2="680" y2="500" class="lane"></line>
+
+          <text x="30" y="62" class="phase">SESSION START — ONCE</text>
+          <text x="20" y="90" class="step-n">1</text>
+          <line x1="70" y1="94" x2="268" y2="94" class="msg-accent" marker-end="url(#arrow3)"></line>
+          <text x="169" y="87" class="msg-lbl" text-anchor="middle">SessionStart → npx -y memoryintel load</text>
+
+          <text x="20" y="120" class="step-n">2</text>
+          <line x1="270" y1="124" x2="678" y2="124" class="msg" marker-end="url(#arrow3)"></line>
+          <text x="474" y="117" class="msg-lbl" text-anchor="middle">read currentMentalModel.md, activeContext.md, [domain files]</text>
+
+          <text x="20" y="150" class="step-n">3</text>
+          <line x1="270" y1="154" x2="72" y2="154" class="msg-accent" marker-end="url(#arrow3)"></line>
+          <text x="169" y="147" class="msg-lbl" text-anchor="middle">plain-text stdout → injected as context</text>
+
+          <text x="30" y="188" class="phase">MID-SESSION — REPEATS EVERY TURN</text>
+          <rect x="16" y="200" width="868" height="180" rx="8" class="loopbox"></rect>
+          <text x="30" y="218" class="phase">loop: for each turn</text>
+
+          <text x="20" y="248" class="step-n">4</text>
+          <line x1="70" y1="252" x2="268" y2="252" class="msg" marker-end="url(#arrow3)"></line>
+          <text x="169" y="245" class="msg-lbl" text-anchor="middle">Stop → npx -y memoryintel check-stop</text>
+
+          <text x="20" y="278" class="step-n">5</text>
+          <line x1="270" y1="282" x2="468" y2="282" class="msg" marker-end="url(#arrow3)"></line>
+          <text x="369" y="275" class="msg-lbl" text-anchor="middle">git status --porcelain (excluding .memoryintel/)</text>
+
+          <text x="20" y="308" class="step-n">6</text>
+          <line x1="270" y1="312" x2="72" y2="312" class="msg-accent" marker-end="url(#arrow3)"></line>
+          <text x="169" y="305" class="msg-lbl" text-anchor="middle">new diff → block once · same diff as last time → allow</text>
+
+          <text x="20" y="352" class="step-n">7</text>
+          <line x1="70" y1="356" x2="268" y2="356" class="msg" marker-end="url(#arrow3)"></line>
+          <text x="169" y="349" class="msg-lbl" text-anchor="middle">agent judges the change worth remembering</text>
+
+          <text x="30" y="410" class="phase">SESSION END — WHEN SOMETHING CHANGED</text>
+          <text x="20" y="438" class="step-n">8</text>
+          <line x1="70" y1="442" x2="268" y2="442" class="msg-accent" marker-end="url(#arrow3)"></line>
+          <text x="169" y="435" class="msg-lbl" text-anchor="middle">npx -y memoryintel update &lt;plan&gt;</text>
+
+          <text x="20" y="468" class="step-n">9</text>
+          <line x1="270" y1="472" x2="678" y2="472" class="msg" marker-end="url(#arrow3)"></line>
+          <text x="474" y="465" class="msg-lbl" text-anchor="middle">write section(s), log event, resolve the check-stop marker</text>
+
+          <text x="20" y="498" class="step-n">10</text>
+          <line x1="470" y1="470" x2="470" y2="490" class="msg" opacity="0"></line>
+        </svg>
+      </figure>
+      <figcaption>Step 6 is the whole anti-nag design in one line: the nudge remembers exactly which diff it already flagged, so it never repeats itself for a change the agent already saw and chose not to act on — only for something genuinely new.</figcaption>
+    </div>
+  </div>
+</section>
+
+<section id="journey">
+  <div class="wide">
+    <p class="eyebrow">User &amp; agent journey</p>
+    <h2>From "let's set this up" to background habit</h2>
+    <p class="lede">Five phases, in the order a real project moves through them. Left column is what the person experiences; right column is what's actually running underneath.</p>
+
+    <div class="journey">
+      <div class="journey-row">
+        <div class="journey-phase">1 · Discover</div>
+        <div class="journey-body">
+          <div class="journey-col">
+            <h4>Person</h4>
+            <p>Installs the memory-intel skill once — <code>npx skills add &lt;owner&gt;/&lt;repo&gt; --skill memory-intel</code> — and, if they want Claude Code automation, installs the plugin.</p>
+          </div>
+          <div class="journey-col">
+            <h4>System</h4>
+            <p>Nothing project-specific exists yet. The skill and the plugin's <code>hooks/hooks.json</code> are now available to every project on the machine.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="journey-row">
+        <div class="journey-phase">2 · Bootstrap</div>
+        <div class="journey-body">
+          <div class="journey-col">
+            <h4>Person</h4>
+            <p>Opens a project, says "set up persistent memory here." Never types a terminal command themselves.</p>
+          </div>
+          <div class="journey-col">
+            <h4>Agent</h4>
+            <p>Skill matches the request, runs <code>npx -y memoryintel init</code>. Reports back in a sentence, not a file listing.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="journey-row">
+        <div class="journey-phase">3 · Every session</div>
+        <div class="journey-body">
+          <div class="journey-col">
+            <h4>Person</h4>
+            <p>Opens the project like any other day. Says nothing about memory at all.</p>
+          </div>
+          <div class="journey-col">
+            <h4>Agent</h4>
+            <p><code>load</code> fires on its own at session start; the agent already has the mental model and active context before the first reply.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="journey-row">
+        <div class="journey-phase">4 · While working</div>
+        <div class="journey-body">
+          <div class="journey-col">
+            <h4>Person</h4>
+            <p>Makes real changes — new architecture, a decision, a fix. Keeps working; never asked to log anything.</p>
+          </div>
+          <div class="journey-col">
+            <h4>Agent</h4>
+            <p>Gets nudged once, at most, if it finishes a turn with an unresolved diff. Decides for itself whether the change is worth <code>update</code> — trivial edits are silently skipped.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="journey-row">
+        <div class="journey-phase">5 · Later, occasionally</div>
+        <div class="journey-body">
+          <div class="journey-col">
+            <h4>Person</h4>
+            <p>Might open the shared local dashboard to see what the agent currently believes about a project, or say "turn the dashboard off" — a single machine-wide switch, not per-project.</p>
+          </div>
+          <div class="journey-col">
+            <h4>System</h4>
+            <p>The dashboard daemon is lazily started by whichever <code>load</code>/<code>update</code> call notices it isn't running yet — never a separate thing to remember to launch.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="self-compression">
+  <div class="wide">
+    <p class="eyebrow">Self-compression</p>
+    <h2>Keeping memory cheap to load, without losing why</h2>
+    <p class="lede"><code>load()</code> reads its files wholesale into every session. Left unchecked, a project's <code>currentMentalModel.md</code> or <code>technical/architecture.md</code> only ever grows — so the same loop that writes memory needs a safe way to shrink it back down, without quietly discarding something that still mattered.</p>
+    <p>No new command exists for this. Compaction is drafted as an ordinary update-plan row with one extra field, <code>kind: compress</code>, and applied through the exact same <code>replace</code> path every other update already uses — the only thing that changes is one extra check before the write.</p>
+
+    <div class="diagram-frame">
+      <figure>
+        <svg viewBox="0 0 960 400" role="img" aria-label="Flow diagram: load() flags a file as over its line ceiling in its manifest, the agent drafts an update-plan row with kind compress, update() checks git status scoped to that one file, and either writes the compacted section and logs it as type compression when the file is clean, or rejects the row and leaves the file untouched, logging it as compression-rejected, when the file is dirty or its git status can't be determined.">
+          <defs>
+            <marker id="arrow4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+            </marker>
+          </defs>
+          <style>
+            .box { fill: none; stroke: currentColor; stroke-width: 1.3; }
+            .box-accent { fill: none; stroke: #2E6E5E; stroke-width: 1.6; }
+            .lbl-b { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; fill: currentColor; }
+            .lbl { font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; fill: currentColor; }
+            .mono { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; fill: currentColor; }
+            .arrow-lbl { font-family: 'IBM Plex Mono', monospace; font-size: 11px; fill: currentColor; }
+            .edge { stroke: currentColor; stroke-width: 1.2; fill: none; }
+            .edge-accent { stroke: #2E6E5E; stroke-width: 1.6; fill: none; }
+            .step-n { font-family: 'IBM Plex Mono', monospace; font-size: 11px; fill: #2E6E5E; font-weight: 600; }
+            .phase { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; fill: currentColor; opacity: 0.55; }
+          </style>
+
+          <text x="16" y="26" class="phase">AT SESSION START, THEN — WHEN THE AGENT DECIDES — AT SESSION END</text>
+
+          <text x="16" y="70" class="step-n">1</text>
+          <rect x="30" y="54" width="230" height="70" rx="8" class="box"></rect>
+          <text x="145" y="82" class="lbl-b" text-anchor="middle">load() flags the file</text>
+          <text x="145" y="100" class="mono" text-anchor="middle" opacity="0.8">status: over (lines &gt; ceiling)</text>
+
+          <line x1="260" y1="89" x2="338" y2="89" class="edge" marker-end="url(#arrow4)"></line>
+
+          <text x="316" y="70" class="step-n">2</text>
+          <rect x="340" y="54" width="230" height="70" rx="8" class="box"></rect>
+          <text x="455" y="82" class="lbl-b" text-anchor="middle">Agent drafts a row</text>
+          <text x="455" y="100" class="mono" text-anchor="middle" opacity="0.8">kind: compress, action: replace</text>
+
+          <line x1="570" y1="89" x2="628" y2="89" class="edge" marker-end="url(#arrow4)"></line>
+
+          <text x="606" y="70" class="step-n">3</text>
+          <rect x="630" y="54" width="280" height="70" rx="8" class="box-accent"></rect>
+          <text x="770" y="82" class="lbl-b" text-anchor="middle">update() checks git status</text>
+          <text x="770" y="100" class="mono" text-anchor="middle" opacity="0.85">scoped to this row's file only</text>
+
+          <line x1="700" y1="124" x2="500" y2="226" class="edge" marker-end="url(#arrow4)"></line>
+          <text x="560" y="180" class="arrow-lbl" text-anchor="middle">clean</text>
+
+          <line x1="840" y1="124" x2="800" y2="226" class="edge" marker-end="url(#arrow4)"></line>
+          <text x="850" y="180" class="arrow-lbl" text-anchor="middle">dirty or unverifiable</text>
+
+          <text x="330" y="248" class="step-n">4a</text>
+          <rect x="350" y="230" width="260" height="100" rx="8" class="box-accent"></rect>
+          <text x="480" y="258" class="lbl-b" text-anchor="middle">Write + log</text>
+          <text x="480" y="278" class="mono" text-anchor="middle" opacity="0.85">type: compression</text>
+          <text x="480" y="300" class="lbl" text-anchor="middle" opacity="0.7">file now under ceiling</text>
+
+          <text x="630" y="248" class="step-n">4b</text>
+          <rect x="650" y="230" width="260" height="100" rx="8" class="box"></rect>
+          <text x="780" y="258" class="lbl-b" text-anchor="middle">Reject + log</text>
+          <text x="780" y="278" class="mono" text-anchor="middle" opacity="0.85">type: compression-rejected</text>
+          <text x="780" y="300" class="lbl" text-anchor="middle" opacity="0.7">file untouched, row is "skipped"</text>
+        </svg>
+      </figure>
+      <figcaption>Step 3 is the whole safety mechanism: git already holds the pre-compression version once the file is clean, so compaction can only ever discard what's already durably recoverable — never something that exists nowhere else.</figcaption>
+    </div>
+
+    <div class="callout">
+      <strong>Git is the archive.</strong> Nothing compressed away is duplicated into a second file inside <code>.memoryintel/</code>. A cut section is fully recoverable from git history — it just stops being loaded by default. That's also why "cannot determine git status at all" is treated the same as "dirty," not as "safe": an unverifiable file is one where that guarantee can't be confirmed.
+    </div>
+
+    <p>The check itself is a signal, not a policy — <code>load()</code> reports <code>status: over</code> and the agent decides, using the same judgment it already applies to whether to update at all, whether this session is a sensible moment to act on it. What actually gets kept or cut is agent judgment, not code, which is where it matters most:</p>
+
+    <div class="verdict-grid">
+      <div class="card verdict-card complement">
+        <h4>Keep verbatim, never compress away</h4>
+        <p>Architecture decisions and their rationale. Unresolved open questions. Anything a future session would need to avoid repeating a mistake or re-deriving a conclusion already reached.</p>
+      </div>
+      <div class="card verdict-card friction">
+        <h4>Safe to compress</h4>
+        <p>Resolved narrative — "tried X, it didn't work, did Y instead" collapses to "Y (not X — see git history for why)." Routine progress entries fully superseded by a later one. Verbose detail a terser statement of the current state already covers.</p>
+      </div>
+    </div>
+    <p style="margin-top:20px;">Rule of thumb, verbatim from <code>instructions.md</code>: if a future session would reasonably ask "why is it built this way?" and the compacted summary can't answer, it compressed too much — keep more.</p>
+  </div>
+</section>
+
+<section id="comparison">
+  <div class="wide">
+    <p class="eyebrow">Comparison</p>
+    <h2>Memory Intel against the rest of the field</h2>
+    <p class="lede">Four tools people actually reach for today, chosen for how differently each one answers the same question: <em>what should an agent remember, and who decides?</em></p>
+
+    <div class="table-wrap">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th style="width:170px;">Dimension</th>
+            <th class="tool self">Memory Intel</th>
+            <th class="tool">claude-mem</th>
+            <th class="tool">Cline Memory Bank</th>
+            <th class="tool">Mem0</th>
+            <th class="tool">Zep</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="dim">Memory model</td>
+            <td><span class="cap cap-yes">Structured domains</span><span class="cap-note">mental model, decisions, architecture — organized like a wiki, not a log</span></td>
+            <td><span class="cap cap-partial">Observation log</span><span class="cap-note">timeline of captured events, searchable — a history, not a current-state summary</span></td>
+            <td><span class="cap cap-yes">Structured domains</span><span class="cap-note">the same idea, hand-maintained — this is literally what Memory Intel automates</span></td>
+            <td><span class="cap cap-partial">Extracted facts</span><span class="cap-note">flat, semantically-searched fact store, not project-shaped</span></td>
+            <td><span class="cap cap-no">Knowledge graph</span><span class="cap-note">temporal entity graph, built for conversational agents</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Automation trigger</td>
+            <td><span class="cap cap-yes">Automatic hooks</span><span class="cap-note">plugin-level, every project, zero setup per project</span></td>
+            <td><span class="cap cap-yes">Automatic hooks</span><span class="cap-note">6 lifecycle events, Claude-Code-native</span></td>
+            <td><span class="cap cap-no">Spoken commands</span><span class="cap-note">"initialize memory bank" / "update memory bank" — nothing happens unless said</span></td>
+            <td><span class="cap cap-no">Explicit API calls</span><span class="cap-note"><span class="mono">mem0.add()</span> / <span class="mono">.search()</span> — the calling app decides when</span></td>
+            <td><span class="cap cap-no">Explicit API calls</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Who classifies "worth remembering"</td>
+            <td><span class="cap cap-yes">The agent's own judgment</span><span class="cap-note">no extra model call — it's the same reasoning already producing the response</span></td>
+            <td><span class="cap cap-partial">A background LLM call</span><span class="cap-note">summarizes observations after the fact, async</span></td>
+            <td><span class="cap cap-no">The person, manually</span></td>
+            <td><span class="cap cap-partial">A dedicated extraction LLM call</span><span class="cap-note">one call per <span class="mono">add()</span>, single-pass ADD-only</span></td>
+            <td><span class="cap cap-partial">Automated graph-building</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Writer determinism</td>
+            <td><span class="cap cap-yes">Deterministic</span><span class="cap-note">heading-addressed, atomic, rejects unknown sections instead of guessing</span></td>
+            <td><span class="cap cap-no">LLM-mediated</span></td>
+            <td><span class="cap cap-no">Free-form edits</span><span class="cap-note">no addressing scheme, no atomicity</span></td>
+            <td><span class="cap cap-no">LLM-mediated</span></td>
+            <td><span class="cap cap-no">LLM-mediated</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Works outside Claude Code</td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">Cursor, Codex, Gemini CLI, opencode via pointer files; pi via the same generic path</span></td>
+            <td><span class="cap cap-partial">Partial</span><span class="cap-note">ships a Codex hook variant; primarily Claude-Code-shaped</span></td>
+            <td><span class="cap cap-partial">Partial</span><span class="cap-note">Cline-specific, though the file pattern has been forked into Roo Code / Kilo Code</span></td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">framework-agnostic by design; also ships Claude/Codex/Cursor plugin variants</span></td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">SDK-based, framework-agnostic</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Team-shareable via git</td>
+            <td><span class="cap cap-yes">Yes, by design</span><span class="cap-note">.memoryintel/ is meant to be committed</span></td>
+            <td><span class="cap cap-no">No</span><span class="cap-note">local SQLite, not intended for version control</span></td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">plain markdown, git-friendly</span></td>
+            <td><span class="cap cap-no">No</span><span class="cap-note">remote DB or local vector store, not a committable artifact</span></td>
+            <td><span class="cap cap-no">No</span><span class="cap-note">Zep Cloud, third-party-hosted</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Data stays local</td>
+            <td><span class="cap cap-yes">Always</span></td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">optional Chroma vector store, off by default</span></td>
+            <td><span class="cap cap-yes">Always</span></td>
+            <td><span class="cap cap-partial">Only self-hosted</span><span class="cap-note">the recommended "zero-ops" path is their cloud platform</span></td>
+            <td><span class="cap cap-no">Never</span><span class="cap-note">Zep is a hosted service by design</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Semantic / vector search</td>
+            <td><span class="cap cap-no">Not yet</span><span class="cap-note">roadmapped, deliberately excluded from this phase</span></td>
+            <td><span class="cap cap-partial">Optional</span></td>
+            <td><span class="cap cap-no">No</span></td>
+            <td><span class="cap cap-yes">Core feature</span></td>
+            <td><span class="cap cap-yes">Core feature</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Read-only dashboard</td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">local, lazily started, one global switch</span></td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">richer viewer, shows the observation timeline</span></td>
+            <td><span class="cap cap-no">No</span></td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">cloud platform dashboard</span></td>
+            <td><span class="cap cap-yes">Yes</span><span class="cap-note">cloud platform dashboard</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Idle process weight</td>
+            <td><span class="cap cap-yes">Near zero</span><span class="cap-note">CLI runs, exits; dashboard daemon is optional and read-only</span></td>
+            <td><span class="cap cap-no">Persistent worker</span><span class="cap-note">background process + SQLite (+ optional Chroma) running continuously</span></td>
+            <td><span class="cap cap-yes">Zero</span><span class="cap-note">it's markdown files — nothing runs, ever</span></td>
+            <td><span class="cap cap-partial">Depends on deployment</span><span class="cap-note">network calls (cloud) or a local vector-DB process (self-hosted)</span></td>
+            <td><span class="cap cap-yes">Zero locally</span><span class="cap-note">fully offloaded to the cloud service</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Keeps memory small over time</td>
+            <td><span class="cap cap-yes">Agent-judgment compaction</span><span class="cap-note">gated on git-clean, no second archive file — see Self-compression above</span></td>
+            <td><span class="cap cap-no">Not applicable</span><span class="cap-note">a searchable timeline, never injected wholesale — growth doesn't inflate per-session cost the same way</span></td>
+            <td><span class="cap cap-no">No mechanism</span><span class="cap-note">files just grow; trimming them is a manual edit like any other</span></td>
+            <td><span class="cap cap-partial">Automatic consolidation</span><span class="cap-note">its extraction pipeline can add/update/delete facts — memory hygiene, not session-file compaction</span></td>
+            <td><span class="cap cap-partial">Temporal edge invalidation</span><span class="cap-note">superseded facts marked invalid in the graph rather than deleted</span></td>
+          </tr>
+          <tr>
+            <td class="dim">Onboarding tokens / session<sup>†</sup></td>
+            <td><span class="cap cap-yes">~300–1,500</span><span class="cap-note">mental model + active context only, domain files load on demand</span></td>
+            <td><span class="cap cap-partial">Injection + ongoing calls</span><span class="cap-note">session context plus continuous background summarization cost</span></td>
+            <td><span class="cap cap-partial">~2,000–6,000, if invoked</span><span class="cap-note">reads all six files, no domain-scoping — and nothing at all if the person forgets to ask</span></td>
+            <td><span class="cap cap-no">~7,000 disclosed</span><span class="cap-note">Mem0's own published figure for a single retrieval call, plus a separate extraction call per <span class="mono">add()</span></span></td>
+            <td><span class="cap cap-no">Billed, not token-metered</span><span class="cap-note">cloud usage pricing, not directly comparable</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-top:14px;">† Directional estimates for a typical session, not measured benchmarks — actual figures vary with project size and usage pattern. The ~7,000-token figure for Mem0 is disclosed in its own README benchmark table (single-pass retrieval, <span class="mono">top_200</span> budget); every other figure here is a reasoned order-of-magnitude estimate from each tool's documented behavior. A no-memory-tool baseline typically spends 8,000–15,000+ tokens re-deriving context from scratch each session, for comparison.</p>
+  </div>
+</section>
+
+<section id="complement">
+  <div class="wide">
+    <p class="eyebrow">Complements or contradicts</p>
+    <h2>Does adding Memory Intel fight with what's already there?</h2>
+    <p class="lede">Mostly no — the four tools above solve different problems well enough that running Memory Intel alongside most of them is additive, not redundant. One real exception, one direct lineage, one non-issue, one different planet.</p>
+
+    <div class="verdict-grid">
+      <div class="card verdict-card complement">
+        <h4>vs. claude-mem — complements, with one shared seam</h4>
+        <p>Genuinely different jobs: claude-mem answers <em>"what happened, and when"</em> (a searchable timeline); Memory Intel answers <em>"what's true about this project right now"</em> (a maintained understanding). Different storage, different files, no write conflicts.</p>
+        <p>The one friction point: both tools register a <span class="mono">SessionStart</span> hook that injects context. Running both means two separate context blocks land at the start of every session — not broken, just some avoidable duplication worth being aware of.</p>
+      </div>
+      <div class="card verdict-card complement">
+        <h4>vs. Mem0 — complements, different altitude</h4>
+        <p>Mem0's job is cross-application semantic memory — user preferences, facts, anything worth recalling by meaning, across whatever agent framework is calling it. Memory Intel's job is one project's structured understanding. A team could reasonably run both: Mem0 for "the user prefers tabs over spaces," Memory Intel for "here's why the auth service is built this way."</p>
+        <p>No automatic double-injection risk — Mem0 is invoked explicitly by whatever's calling it, not via a competing session hook.</p>
+      </div>
+      <div class="card verdict-card friction">
+        <h4>vs. Cline Memory Bank — direct lineage, pick one</h4>
+        <p>This is the pattern Memory Intel's own PRD was written against, almost file-for-file: <span class="mono">projectbrief.md</span>, <span class="mono">activeContext.md</span>, <span class="mono">progress.md</span> — the same shape, minus every automatic trigger. Running both on one project means two overlapping, competing sets of near-identical files.</p>
+        <p>If a team is already disciplined about manually saying "update memory bank" every session, Memory Intel is the automated version of the same idea, not an addition to it — a replacement, not a companion.</p>
+      </div>
+      <div class="card verdict-card friction">
+        <h4>vs. Zep — different category, comparison doesn't really apply</h4>
+        <p>Zep is built for customer-facing conversational agents — support bots, personal assistants — with a temporal knowledge graph as its core primitive. It has no meaningful overlap with a coding agent's project memory; the two would never compete for the same job, and there's nothing to complement either. Included above only to show the boundary of the category.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="doc-foot">
+  Reflects the codebase as of this document's writing. Full design rationale lives in <span class="mono">docs/superpowers/specs/</span>; this page exists to show the mechanism, not argue for it.
+</footer>

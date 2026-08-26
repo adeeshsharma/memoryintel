@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - run: npm ci
+
+      # Compile only (no skill regeneration yet) so build:skill:check compares against the
+      # SKILL.md actually committed to the repo, not one build:skill just freshly regenerated -
+      # `npm run build` runs both steps unconditionally, which would make this check trivially
+      # pass even when the committed file has drifted from src/skill.ts.
+      - run: npx tsc -p tsconfig.json
+      - run: npm run build:skill:check
+
+      - run: npm run build
+      - run: npm test
+
+      - run: npm pack --dry-run

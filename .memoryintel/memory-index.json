@@ -1,0 +1,26 @@
+{
+  "context/currentMentalModel.md": {
+    "lastUpdated": "2026-08-23T10:02:51.326Z",
+    "summary": "Fifth real-usage pass: full git-to-release audit, first-ever Windows test run found and fixed three real cross-platform bugs, CI/branch-protection/OSS-readiness now in place"
+  },
+  "context/activeContext.md": {
+    "lastUpdated": "2026-08-21T14:17:16.633Z",
+    "summary": "remote configured and pushed to GitHub"
+  },
+  "context/progress.md": {
+    "lastUpdated": "2026-08-21T14:17:16.634Z",
+    "summary": "remote configured and pushed to GitHub"
+  },
+  "business/roadmap.md": {
+    "lastUpdated": "2026-08-23T17:19:25.723Z",
+    "summary": "Direct user request - a UI-level stop control, not just the CLI command, landed as part of the dist-executable-bit PR"
+  },
+  "technical/infrastructure.md": {
+    "lastUpdated": "2026-08-23T10:02:28.171Z",
+    "summary": "CI now exists - this section described a real, acknowledged gap before"
+  },
+  "technical/techContext.md": {
+    "lastUpdated": "2026-08-23T10:02:28.172Z",
+    "summary": "CI now exists and is enforced via branch protection"
+  }
+}

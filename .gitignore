@@ -1,0 +1,19 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# OS/editor cruft
+.DS_Store
+*.log
+
+# Local environment
+.env
+
+# Atomic-write temp files
+*.tmp-*
+
+# Transient Memory Intel runtime state (never commit these from a project using this tool)
+.memoryintel/.lock
+.memoryintel/.session-marker.json

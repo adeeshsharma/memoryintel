@@ -1,0 +1,49 @@
+name: release-please
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+        if: ${{ steps.release.outputs.release_created }}
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+
+      - uses: actions/setup-node@v4
+        if: ${{ steps.release.outputs.release_created }}
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      - run: npm ci
+        if: ${{ steps.release.outputs.release_created }}
+      # Same recipe CI runs on every PR, so a release can never publish something that wouldn't
+      # have passed the normal gate.
+      - run: npm run build
+        if: ${{ steps.release.outputs.release_created }}
+      - run: npm test
+        if: ${{ steps.release.outputs.release_created }}
+
+      # OIDC exchange needs npm >=11.5.1 - actions/setup-node's bundled npm for a given Node
+      # version lags behind that, and an older npm silently falls back to an unauthenticated
+      # publish attempt (a bare 404, not a clear auth error) instead of using OIDC at all.
+      - run: npm install -g npm@latest
+        if: ${{ steps.release.outputs.release_created }}
+
+      - run: npm publish --access public
+        if: ${{ steps.release.outputs.release_created }}

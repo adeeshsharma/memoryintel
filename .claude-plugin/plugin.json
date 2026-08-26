@@ -1,0 +1,9 @@
+{
+  "name": "memoryintel",
+  "description": "Persistent project memory for AI coding agents — initialize once, then agents automatically load and update project understanding across sessions.",
+  "version": "0.1.2",
+  "author": {
+    "name": "Adeesh Sharma",
+    "url": "https://github.com/adeeshsharma"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "context/currentMentalModel.md": {
-    "lastUpdated": "2026-08-23T10:02:51.326Z",
-    "summary": "Fifth real-usage pass: full git-to-release audit, first-ever Windows test run found and fixed three real cross-platform bugs, CI/branch-protection/OSS-readiness now in place"
+    "lastUpdated": "2026-08-26T20:49:59.922Z",
+    "summary": "Whole-file replace per this project's own convention: shipped a real new command, rebuilt/renamed/republished the repo, and made three firm architectural must-not-do calls - all well above the small-localized-fact bar for a mental-model rewrite."
   },
   "context/activeContext.md": {
     "lastUpdated": "2026-08-21T14:17:16.633Z",
@@ -12,8 +12,8 @@
     "summary": "remote configured and pushed to GitHub"
   },
   "business/roadmap.md": {
-    "lastUpdated": "2026-08-23T17:19:25.723Z",
-    "summary": "Direct user request - a UI-level stop control, not just the CLI command, landed as part of the dist-executable-bit PR"
+    "lastUpdated": "2026-08-26T20:49:25.803Z",
+    "summary": "Real feature shipped, not just planned; recording what it does and doesn't cover yet."
   },
   "technical/infrastructure.md": {
     "lastUpdated": "2026-08-23T10:02:28.171Z",
@@ -22,5 +22,9 @@
   "technical/techContext.md": {
     "lastUpdated": "2026-08-23T10:02:28.172Z",
     "summary": "CI now exists and is enforced via branch protection"
+  },
+  "context/decisions.md": {
+    "lastUpdated": "2026-08-26T20:49:25.800Z",
+    "summary": "User's explicit prioritization: brownfield import is the real gap; SQLite/semantic-retrieval are explicitly not directions to pursue."
   }
 }

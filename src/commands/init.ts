@@ -7,6 +7,14 @@ const INSTRUCTIONS_TEMPLATE = `# Memory Intel Instructions
 
 This project uses Memory Intel. Read this file at the start of every session.
 
+## First session on an existing project
+If \`.memoryintel/\` was just initialized on a project that already has real history (not a fresh
+scaffold), run \`memoryintel import\` once before anything else. It mechanically pulls
+\`memory-bank/\`, \`ARCHITECTURE.md\`, and \`README.md\` content verbatim into the mapped sections —
+cheap, deterministic, no judgment required. Its output is raw and unfiled by design; treat it as
+source material to read and properly re-file into the right sections yourself, not as finished
+memory. Safe to run more than once — already-imported content is skipped, not duplicated.
+
 ## Session start
 Run \`memoryintel load [--domain technical|business|research]\` and treat its output as project context.
 Its manifest reports each loaded file's \`lines\`, \`ceiling\`, and \`status\` (\`over\`/\`under\`) — see

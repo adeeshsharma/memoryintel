@@ -120,6 +120,22 @@ when something meaningful changes — never a changelog, always a maintained und
 project as it currently is. See `.memoryintel/context/decisions.md` in this very repository for
 the specific design decisions behind that, with rationale.
 
+## Existing projects (not greenfield)
+
+`memoryintel init` scaffolds empty files — fine for a brand-new project, wasteful for one that
+already has real history. If the project already has a `memory-bank/` directory (the
+Cline/Roo/Kilo-Code convention), an `ARCHITECTURE.md`, or a `README.md`, run:
+
+```bash
+memoryintel import
+```
+
+after `init`. It's a mechanical transcription step, not a judgment step: it copies each
+recognized source's content verbatim into the mapped `.memoryintel/` section, tagged with where
+it came from and a note that it hasn't been re-filed into finer sections yet. It never
+summarizes, splits, or interprets — that's real judgment work, deliberately left to the agent's
+next real `update`. Safe to re-run; already-imported content is skipped, not duplicated.
+
 ## Benchmarks: with vs. without
 
 Measured on a real second project ([distilled-docs](https://github.com/adeeshsharma/distilled-docs),

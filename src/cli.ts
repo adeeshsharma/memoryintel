@@ -7,6 +7,7 @@ import { runUpdate } from './commands/update.js';
 import { runLoad } from './commands/load.js';
 import { runStatus } from './commands/status.js';
 import { runInit } from './commands/init.js';
+import { runImport } from './commands/import.js';
 import { runCheckStop } from './adapters/claudeCode.js';
 import { runDashboardEnable, runDashboardDisable } from './commands/dashboardToggle.js';
 import { runDaemonStart } from './commands/daemonStart.js';
@@ -21,6 +22,7 @@ export const USAGE = `Usage: memoryintel <command> [options]
 
 Commands:
   init [path]              Initialize .memoryintel/ in the current or given directory
+  import [path]            Pull memory-bank/, ARCHITECTURE.md, README.md into .memoryintel/
   load [--domain <d>]      Print resolved memory context to stdout
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)
   status                   Print a human-readable summary of current memory state
@@ -98,6 +100,24 @@ async function main(): Promise<void> {
       await runDaemonStart();
       // Intentionally never resolves further — this process IS the daemon, kept alive by the
       // listening HTTP server, until `memoryintel dashboard disable` sends it SIGTERM.
+      return;
+    }
+
+    if (command === 'import') {
+      const root = findMemoryIntelRoot(process.cwd());
+      if (!root) {
+        process.stderr.write('No .memoryintel/ found. Run `memoryintel init` first.\n');
+        process.exitCode = 1;
+        return;
+      }
+      const targetDir = argv[1] ? join(process.cwd(), argv[1]) : process.cwd();
+      const result = await runImport(root, targetDir);
+      if (result.sourcesFound.length === 0) {
+        process.stdout.write('No brownfield sources found (looked for memory-bank/, ARCHITECTURE.md, README.md).\n');
+      } else {
+        process.stdout.write(`Sources found: ${result.sourcesFound.join(', ')}\nApplied: ${result.applied.join(', ') || '(none)'}\nSkipped: ${result.skipped.join(', ') || '(none)'}\n`);
+      }
+      process.exitCode = 0;
       return;
     }
 

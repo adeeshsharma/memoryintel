@@ -39,6 +39,7 @@ Usage: memoryintel <command> [options]
 
 Commands:
   init [path]              Initialize .memoryintel/ in the current or given directory
+  import [path]            Pull memory-bank/, ARCHITECTURE.md, README.md into .memoryintel/
   load [--domain <d>]      Print resolved memory context to stdout
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)
   status                   Print a human-readable summary of current memory state

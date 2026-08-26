@@ -16,7 +16,7 @@ describe('cli dispatch', () => {
 
   it('documents every implemented command in the usage text', () => {
     const usage = dispatch([]).stdout;
-    for (const command of ['init', 'load', 'update', 'status', 'check-stop']) {
+    for (const command of ['init', 'import', 'load', 'update', 'status', 'check-stop']) {
       expect(usage).toContain(command);
     }
   });

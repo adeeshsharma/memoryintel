@@ -1,7 +1,17 @@
-import { relative } from 'node:path';
+import { relative, sep } from 'node:path';
 import { runUpdate } from './update.js';
 import { encodeToonTable } from '../core/toon.js';
 import { walkFiles, findDocuments, type DocFile } from '../core/repoScan.js';
+
+// relative() returns backslash-separated paths on Windows. These labels get baked into
+// permanent memory content (the `reason` field, the annotate() header) alongside every other
+// file reference in this project, which is always forward-slash (e.g. `technical/architecture.md`)
+// - a Windows-only backslash would be a visible, permanent inconsistency in stored memory, not
+// just a display quirk. Same class of bug already hit and fixed elsewhere in this codebase
+// (assertSafePath, the compression git-clean check) - normalize once, right at the source.
+function toPosixRelative(targetDir: string, absPath: string): string {
+  return relative(targetDir, absPath).split(sep).join('/');
+}
 
 export interface ImportResult {
   applied: string[];
@@ -40,7 +50,7 @@ const ROUTES: { keywords: string[]; file: string; section: string }[] = [
 const DEFAULT_ROUTE = { file: 'context/projectBrief.md', section: 'Overview' };
 
 function route(doc: DocFile, targetDir: string): { file: string; section: string } {
-  const haystack = `${relative(targetDir, doc.path)} ${doc.title}`.toLowerCase();
+  const haystack = `${toPosixRelative(targetDir, doc.path)} ${doc.title}`.toLowerCase();
   for (const r of ROUTES) {
     if (r.keywords.some((k) => haystack.includes(k))) return { file: r.file, section: r.section };
   }
@@ -60,10 +70,10 @@ export async function runImport(root: string, targetDir: string): Promise<Import
     return { applied: [], skipped: [], sourcesFound: [] };
   }
 
-  const sourcesFound = docs.map((d) => relative(targetDir, d.path));
+  const sourcesFound = docs.map((d) => toPosixRelative(targetDir, d.path));
   const candidates = docs.map((doc) => {
     const target = route(doc, targetDir);
-    const label = relative(targetDir, doc.path);
+    const label = toPosixRelative(targetDir, doc.path);
     return {
       file: target.file,
       action: 'append',

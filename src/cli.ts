@@ -7,6 +7,8 @@ import { runUpdate } from './commands/update.js';
 import { runLoad } from './commands/load.js';
 import { runStatus } from './commands/status.js';
 import { runInit } from './commands/init.js';
+import { runImport } from './commands/import.js';
+import { runScan } from './commands/scan.js';
 import { runCheckStop } from './adapters/claudeCode.js';
 import { runDashboardEnable, runDashboardDisable } from './commands/dashboardToggle.js';
 import { runDaemonStart } from './commands/daemonStart.js';
@@ -21,6 +23,10 @@ export const USAGE = `Usage: memoryintel <command> [options]
 
 Commands:
   init [path]              Initialize .memoryintel/ in the current or given directory
+  scan [path]              Print a quick, no-LLM digest of an existing codebase's stack and
+                           top-level layout - orientation only, not architecture
+  import [path]            Pull every real .md/.html document in the repo (not just
+                           memory-bank/-style files) into the matching .memoryintel/ section
   load [--domain <d>]      Print resolved memory context to stdout
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)
   status                   Print a human-readable summary of current memory state
@@ -44,6 +50,10 @@ export function dispatch(argv: string[]): DispatchResult {
       const target = argv[1] ? join(process.cwd(), argv[1]) : process.cwd();
       runInit(target);
       return { exitCode: 0, stdout: `Initialized Memory Intel in ${join(target, '.memoryintel')}\n`, stderr: '' };
+    }
+    case 'scan': {
+      const target = argv[1] ? join(process.cwd(), argv[1]) : process.cwd();
+      return { exitCode: 0, stdout: runScan(target), stderr: '' };
     }
     case 'load': {
       const domainFlagIndex = argv.indexOf('--domain');
@@ -98,6 +108,24 @@ async function main(): Promise<void> {
       await runDaemonStart();
       // Intentionally never resolves further — this process IS the daemon, kept alive by the
       // listening HTTP server, until `memoryintel dashboard disable` sends it SIGTERM.
+      return;
+    }
+
+    if (command === 'import') {
+      const root = findMemoryIntelRoot(process.cwd());
+      if (!root) {
+        process.stderr.write('No .memoryintel/ found. Run `memoryintel init` first.\n');
+        process.exitCode = 1;
+        return;
+      }
+      const targetDir = argv[1] ? join(process.cwd(), argv[1]) : process.cwd();
+      const result = await runImport(root, targetDir);
+      if (result.sourcesFound.length === 0) {
+        process.stdout.write('No brownfield sources found (looked for memory-bank/, ARCHITECTURE.md, README.md).\n');
+      } else {
+        process.stdout.write(`Sources found: ${result.sourcesFound.join(', ')}\nApplied: ${result.applied.join(', ') || '(none)'}\nSkipped: ${result.skipped.join(', ') || '(none)'}\n`);
+      }
+      process.exitCode = 0;
       return;
     }
 

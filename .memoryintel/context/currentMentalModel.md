@@ -1,37 +1,9 @@
-Memory Intel is a persistent, cross-session project-memory tool for AI coding agents (Claude
-Code, Cursor, Codex, Gemini CLI). A person sets it up once per project by asking an agent to
-("set up persistent memory here" - the memory-intel skill runs `memoryintel init`); after that,
-agents load `.memoryintel/` context automatically at session start and update it on their own
-judgment when something meaningful changes.
+Memory Intel (npm: `memoryintel`) is a persistent, cross-session project-memory tool for AI coding agents (Claude Code, Cursor, Codex, Gemini CLI). A person sets it up once per project by asking an agent to (set up persistent memory here - the memoryintel skill runs `memoryintel init`); after that, agents load `.memoryintel/` context automatically at session start and update it on their own judgment when something meaningful changes.
 
-The CLI core (init/load/update/status/check-stop/dashboard) is fully built and tested (207 tests
-passing). Real usage has gone through five passes on distilled-docs plus a genuine live-hook
-verification and, now, a full `git-to-release` audit that finally ran this project's own test
-suite on Windows for the first time ever - and found three real, previously-invisible bugs on
-the very first run, all now fixed: `assertSafePath`'s containment check hardcoded a forward
-slash (`resolved.startsWith(resolvedRoot + '/')`), which fails unconditionally on Windows since
-`path.resolve()` returns backslash paths there - `memoryintel update` was completely broken on
-Windows, rejecting every legitimate write; the compression git-clean check built its comparison
-path with the OS-native `path.join` and compared it against git's always-forward-slash porcelain
-output, so every file looked permanently clean on Windows, silently accepting compression on
-dirty files (the inverse failure mode of the first bug); and a test added this session hardcoded
-`/bin/sh`, which doesn't exist on `windows-latest`. All three fixed with cross-platform-safe
-patterns (`path.relative`, `path.posix.join`, `spawnSync`'s own `input` option), verified by the
-same CI matrix that caught them - all three OS jobs (ubuntu/windows/macos) are green.
+The repo itself was rebuilt from scratch this cycle: a commit had gone out from the user's company network and gotten flagged on the company's side, so the whole GitHub repo was deleted and recreated with fresh git history, renamed memory-intel -> memoryintel throughout, and republished on npm as 1.0.0 (0.1.0-0.1.2 are permanently blocked after the old package was unpublished). npm Trusted Publishing (OIDC) is wired to release-please.yml for future releases.
 
-Repo is now public with: LICENSE (MIT), a real CONTRIBUTING.md (explicitly open to outside
-contributions, not the "not accepting PRs" default - the user's explicit choice), CI required via
-branch protection on `master` (0 required reviewers, single-maintainer project), `.editorconfig`/
-`.gitattributes`, and `author`/`keywords` filled in `package.json`. README documents a real,
-working `npx skills add adeeshsharma/memory-intel --skill memory-intel` install path (verified
-live - pulls from GitHub directly, independent of npm publish status), clearly distinguished from
-the still-blocked `npm install -g` path.
+The CLI core (init/scan/import/load/update/status/check-stop/dashboard) is fully built and tested (237 tests passing, all green on the 3-OS CI matrix). scan and import - the two brownfield-onboarding commands added this cycle - went through two real rounds of user-driven redesign before landing (full rationale in context/decisions.md): the first cut tried to mechanically infer architecture via JS/TS/Python import-graph ranking and git-churn ranking, which both failed to generalize (language-specific, and git history isn't guaranteed to exist - a local research project may have neither). The user's resolving insight: inferring architecture is a judgment task no mechanical scan can honestly do, and this project already has a mechanism for judgment - the agent's own accumulated update calls as it works, the same way a greenfield project already builds understanding. So scan and import were narrowed to just that: scan prints stack + a one-level directory listing, nothing else; import walks the whole repo for any real .md/.html document (general keyword-routing by filename/title, not a fixed memory-bank/-style table) and copies each one verbatim into the matching section, filtering out SPA-shell HTML and memoryintel's own AGENTS.md/GEMINI.md pointer boilerplate so neither gets mistaken for real project content. The import-graph and git-churn code from the first cut was deleted outright, not kept as a fallback, once it had no caller left.
 
-What's still genuinely not done: never published to the npm registry - not logged into npm on
-this machine, and publishing is treated as an explicit, in-the-moment decision, not something to
-do unprompted, same discipline as `docmanager reset`/SSH key generation in sibling projects. The
-dashboard has no real file-hierarchy view, `research/*`/`objectives.md` scaffolding doesn't flex
-to project type, pointer-file tools (cursor/agents-md/gemini) show as 'wired' with no equivalent
-'actually used' signal claude-code now has, and a devDependency-only npm audit finding
-(esbuild/vite/vitest chain) is deferred - dev-server-only, never ships to consumers. See
-`context/activeContext.md` for the immediate focus and `business/roadmap.md` for next steps.
+Also this cycle: deleted the dead .memoryintel/intelligence/{entities,metadata,relationships}.json scaffolding from this repo's own dogfood folder, and logged three explicit product must-not-do decisions: no reopening semantic-retrieval/knowledge-graph, no moving core .memoryintel/ content to SQLite, no chasing broad agent-tool adapter coverage before the flagship Claude Code experience is deeper. The scan/import rework adds a fourth, more general one: no mechanical architecture inference of any kind (import graphs, git churn/co-change, keyword-frequency extraction) - that line holds regardless of how clever the technique, because the actual problem is that architecture understanding requires judgment, not better mechanics.
+
+What's still genuinely not done: the dashboard has no real file-hierarchy view; research/*/objectives.md scaffolding doesn't flex to project type; pointer-file tools show as 'wired' with no 'actually used' signal; a devDependency-only npm audit finding is deferred; neither scan nor import has a binary-level (spawned-process) test yet, only unit-level; import's keyword-routing table is a fixed guess at common domain vocabulary and will misroute a document whose filename/title doesn't match any of it (falls back to projectBrief.md, at least never silently dropped). See context/activeContext.md for the immediate focus and business/roadmap.md for the fuller list.

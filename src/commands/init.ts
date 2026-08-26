@@ -7,6 +7,26 @@ const INSTRUCTIONS_TEMPLATE = `# Memory Intel Instructions
 
 This project uses Memory Intel. Read this file at the start of every session.
 
+## First session on an existing project
+If \`.memoryintel/\` was just initialized on a project that already has real history (not a fresh
+scaffold), run both before anything else - neither tries to reverse-engineer architecture, so
+neither is a substitute for the other:
+
+1. \`memoryintel import\` walks the whole repo for real documentation (any \`.md\`/\`.html\` file,
+   not a fixed list of known filenames) and mechanically copies each one's content verbatim into
+   the \`.memoryintel/\` section its filename/title best matches. Deterministic, no judgment. Its
+   output is raw and unfiled by design; treat it as source material to read and properly re-file
+   yourself, not as finished memory.
+2. \`memoryintel scan\` never writes anything - it prints detected stack and a one-level-deep
+   directory listing, nothing more. Enough to answer "how do I run this", not an attempt at
+   understanding the codebase's architecture.
+
+Real understanding - architecture, patterns, why things are built the way they are - is not
+something either command can honestly derive. It builds the same way it already does on a
+greenfield project: through your own judgment as you actually work here, one real \`update\` at a
+time. Both commands are safe to run more than once - \`import\`'s already-imported content is
+skipped, not duplicated, and \`scan\` never writes anything at all.
+
 ## Session start
 Run \`memoryintel load [--domain technical|business|research]\` and treat its output as project context.
 Its manifest reports each loaded file's \`lines\`, \`ceiling\`, and \`status\` (\`over\`/\`under\`) — see

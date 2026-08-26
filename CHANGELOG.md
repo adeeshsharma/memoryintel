@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.0.0...memoryintel-v1.0.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* normalize import's path labels to forward slashes on Windows ([#2](https://github.com/adeeshsharma/memoryintel/issues/2)) ([f5f6d37](https://github.com/adeeshsharma/memoryintel/commit/f5f6d37b2bf34f058992f05260afa1ffb4bc90a2))
+
 ## [0.1.2](https://github.com/adeeshsharma/memory-intel/compare/memoryintel-v0.1.1...memoryintel-v0.1.2) (2026-08-23)
 
 

@@ -8,6 +8,7 @@ import { runLoad } from './commands/load.js';
 import { runStatus } from './commands/status.js';
 import { runInit } from './commands/init.js';
 import { runImport } from './commands/import.js';
+import { runScan } from './commands/scan.js';
 import { runCheckStop } from './adapters/claudeCode.js';
 import { runDashboardEnable, runDashboardDisable } from './commands/dashboardToggle.js';
 import { runDaemonStart } from './commands/daemonStart.js';
@@ -22,6 +23,9 @@ export const USAGE = `Usage: memoryintel <command> [options]
 
 Commands:
   init [path]              Initialize .memoryintel/ in the current or given directory
+  scan [path]              Print a quick, no-LLM digest of an existing codebase (stack,
+                           git churn, import hub files, other docs) - a starting point for
+                           the first real memory-writing pass on a brownfield project
   import [path]            Pull memory-bank/, ARCHITECTURE.md, README.md into .memoryintel/
   load [--domain <d>]      Print resolved memory context to stdout
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)
@@ -46,6 +50,10 @@ export function dispatch(argv: string[]): DispatchResult {
       const target = argv[1] ? join(process.cwd(), argv[1]) : process.cwd();
       runInit(target);
       return { exitCode: 0, stdout: `Initialized Memory Intel in ${join(target, '.memoryintel')}\n`, stderr: '' };
+    }
+    case 'scan': {
+      const target = argv[1] ? join(process.cwd(), argv[1]) : process.cwd();
+      return { exitCode: 0, stdout: runScan(target), stderr: '' };
     }
     case 'load': {
       const domainFlagIndex = argv.indexOf('--domain');

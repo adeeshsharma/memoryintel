@@ -39,6 +39,9 @@ Usage: memoryintel <command> [options]
 
 Commands:
   init [path]              Initialize .memoryintel/ in the current or given directory
+  scan [path]              Print a quick, no-LLM digest of an existing codebase (stack,
+                           git churn, import hub files, other docs) - a starting point for
+                           the first real memory-writing pass on a brownfield project
   import [path]            Pull memory-bank/, ARCHITECTURE.md, README.md into .memoryintel/
   load [--domain <d>]      Print resolved memory context to stdout
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)

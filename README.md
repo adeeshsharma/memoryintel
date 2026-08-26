@@ -123,18 +123,31 @@ the specific design decisions behind that, with rationale.
 ## Existing projects (not greenfield)
 
 `memoryintel init` scaffolds empty files — fine for a brand-new project, wasteful for one that
-already has real history. If the project already has a `memory-bank/` directory (the
-Cline/Roo/Kilo-Code convention), an `ARCHITECTURE.md`, or a `README.md`, run:
+already has real history. Two commands help, and most existing projects want both, in order:
 
 ```bash
-memoryintel import
+memoryintel scan     # read-only: a quick, no-LLM digest of the codebase itself
+memoryintel import   # write: pulls memory-bank/, ARCHITECTURE.md, README.md into .memoryintel/
 ```
 
-after `init`. It's a mechanical transcription step, not a judgment step: it copies each
-recognized source's content verbatim into the mapped `.memoryintel/` section, tagged with where
-it came from and a note that it hasn't been re-filed into finer sections yet. It never
-summarizes, splits, or interprets — that's real judgment work, deliberately left to the agent's
-next real `update`. Safe to re-run; already-imported content is skipped, not duplicated.
+**`scan`** is for the common case: a project with no `memory-bank/` or `ARCHITECTURE.md` at all,
+just code — reading a README/ARCHITECTURE.md isn't a real solution there, and a project that
+already has a well-organized `memory-bank/` wouldn't need memoryintel as much in the first place.
+It never writes anything, just prints a digest to stdout: detected stack (from `package.json`/
+`pyproject.toml`/`go.mod`/`Cargo.toml`), the most-changed files by git history, the most-imported
+local files (JS/TS/Python import graphs only, ranked by in-degree — a cheap, deterministic proxy
+for "architecturally central" without reading a single file's actual meaning), and any other
+markdown/HTML documentation found in the tree. The agent reads this once and decides what belongs
+in `architecture.md`/`patterns.md`/etc. using real judgment — `scan` just makes that first read
+cheap instead of reading the whole tree cold.
+
+**`import`** is for the less common but higher-confidence case: a project that already has
+`memory-bank/`, `ARCHITECTURE.md`, or a `README.md`. It's a mechanical transcription step, not a
+judgment step: it copies each recognized source's content verbatim into the mapped
+`.memoryintel/` section, tagged with where it came from and a note that it hasn't been re-filed
+into finer sections yet. It never summarizes, splits, or interprets — that's real judgment work,
+deliberately left to the agent's next real `update`. Safe to re-run; already-imported content is
+skipped, not duplicated.
 
 ## Benchmarks: with vs. without
 

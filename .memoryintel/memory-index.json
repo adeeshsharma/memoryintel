@@ -1,7 +1,7 @@
 {
   "context/currentMentalModel.md": {
-    "lastUpdated": "2026-08-26T20:49:59.922Z",
-    "summary": "Whole-file replace per this project's own convention: shipped a real new command, rebuilt/renamed/republished the repo, and made three firm architectural must-not-do calls - all well above the small-localized-fact bar for a mental-model rewrite."
+    "lastUpdated": "2026-08-26T21:04:38.160Z",
+    "summary": "Whole-file replace: fixing a real authoring bug (previous version had literal backslash-n text and mangled quotes from hand-typed TOON escaping instead of using encodeToonTable), and updating for the scan command shipped this cycle."
   },
   "context/activeContext.md": {
     "lastUpdated": "2026-08-21T14:17:16.633Z",
@@ -12,8 +12,8 @@
     "summary": "remote configured and pushed to GitHub"
   },
   "business/roadmap.md": {
-    "lastUpdated": "2026-08-26T20:49:25.803Z",
-    "summary": "Real feature shipped, not just planned; recording what it does and doesn't cover yet."
+    "lastUpdated": "2026-08-26T21:02:54.015Z",
+    "summary": "Real feature shipped; recording the explicit scope boundary so a later session doesn't assume more is covered than actually is."
   },
   "technical/infrastructure.md": {
     "lastUpdated": "2026-08-23T10:02:28.171Z",
@@ -24,7 +24,7 @@
     "summary": "CI now exists and is enforced via branch protection"
   },
   "context/decisions.md": {
-    "lastUpdated": "2026-08-26T20:49:25.800Z",
-    "summary": "User's explicit prioritization: brownfield import is the real gap; SQLite/semantic-retrieval are explicitly not directions to pursue."
+    "lastUpdated": "2026-08-26T21:02:54.013Z",
+    "summary": "User's explicit design correction: reading existing docs (import) only covers a narrow, already-well-served slice of brownfield projects; scan covers the actual common case of source code with no prior documentation at all."
   }
 }

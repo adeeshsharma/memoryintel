@@ -9,11 +9,21 @@ This project uses Memory Intel. Read this file at the start of every session.
 
 ## First session on an existing project
 If \`.memoryintel/\` was just initialized on a project that already has real history (not a fresh
-scaffold), run \`memoryintel import\` once before anything else. It mechanically pulls
-\`memory-bank/\`, \`ARCHITECTURE.md\`, and \`README.md\` content verbatim into the mapped sections —
-cheap, deterministic, no judgment required. Its output is raw and unfiled by design; treat it as
-source material to read and properly re-file into the right sections yourself, not as finished
-memory. Safe to run more than once — already-imported content is skipped, not duplicated.
+scaffold), do this before anything else:
+
+1. Run \`memoryintel import\` if the project has \`memory-bank/\`, \`ARCHITECTURE.md\`, or a
+   \`README.md\` — it mechanically pulls their content verbatim into the mapped sections. Cheap,
+   deterministic, no judgment required. Its output is raw and unfiled by design; treat it as
+   source material to read and properly re-file yourself, not as finished memory.
+2. Otherwise (most existing codebases have none of those, just code), run \`memoryintel scan\`
+   instead. It never writes anything — it prints a read-only digest of the codebase itself:
+   detected stack, most-changed files by git history, the most-imported local files (a cheap,
+   deterministic proxy for "architecturally central"), and any other docs found in the tree. Read
+   the files it points at, then write \`architecture.md\`/\`patterns.md\`/etc. yourself using real
+   judgment — \`scan\` only makes that first read cheap, it never decides what the project is.
+
+Both are safe to run more than once — \`import\`'s already-imported content is skipped, not
+duplicated, and \`scan\` never writes anything at all.
 
 ## Session start
 Run \`memoryintel load [--domain technical|business|research]\` and treat its output as project context.

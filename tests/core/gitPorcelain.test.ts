@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runGitStatusPorcelain, porcelainPath, isPathClean, runGitRevParseHead } from '../../src/core/gitPorcelain.js';
+import { runGitStatusPorcelain, porcelainPath, isPathClean, runGitRevParseHead, runGitChurn } from '../../src/core/gitPorcelain.js';
 
 let root: string;
 
@@ -93,5 +93,26 @@ describe('isPathClean', () => {
     writeFileSync(join(root, 'a.txt'), 'changed');
 
     expect(isPathClean(root, 'a.txt')).toBe(false);
+  });
+});
+
+describe('runGitChurn', () => {
+  it('ranks files by number of commits touching them', () => {
+    initGitRepo(root);
+    writeFileSync(join(root, 'hot.txt'), '1');
+    writeFileSync(join(root, 'cold.txt'), '1');
+    commitAll(root, 'initial');
+    writeFileSync(join(root, 'hot.txt'), '2');
+    commitAll(root, 'second');
+    writeFileSync(join(root, 'hot.txt'), '3');
+    commitAll(root, 'third');
+
+    const churn = runGitChurn(root);
+    expect(churn[0]).toEqual({ path: 'hot.txt', changes: 3 });
+    expect(churn.find((c) => c.path === 'cold.txt')?.changes).toBe(1);
+  });
+
+  it('returns an empty list, not a throw, outside a git repository', () => {
+    expect(runGitChurn(root)).toEqual([]);
   });
 });

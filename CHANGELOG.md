@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.0.1...memoryintel-v1.0.2) (2026-08-30)
+
+
+### Bug Fixes
+
+* make the agent pointer block a hard checklist, not a soft aside ([#4](https://github.com/adeeshsharma/memoryintel/issues/4)) ([9cf6ef5](https://github.com/adeeshsharma/memoryintel/commit/9cf6ef54d607201d78c62efad805fc803b32599c))
+
 ## [1.0.1](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.0.0...memoryintel-v1.0.1) (2026-08-26)
 
 

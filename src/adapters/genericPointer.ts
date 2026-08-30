@@ -33,6 +33,31 @@ function upsertPointerBlock(filePath: string, existingContentIfNew: string): voi
   writeFileSync(filePath, `${content}${separator}${POINTER_BLOCK}\n`);
 }
 
+export const ADAPTER_FILE_PATHS = ['AGENTS.md', 'GEMINI.md', join('.cursor', 'rules', 'memoryintel.mdc')];
+
+export type PointerBlockRefreshResult = 'refreshed' | 'unchanged' | 'not-installed' | 'missing-file';
+
+// Unlike upsertPointerBlock (install-if-missing, used by init - never overwrites an existing
+// block), this always resyncs an EXISTING block to the current POINTER_BLOCK. Safe by
+// construction: the markers themselves are the proof this span is machine-owned, regardless of
+// what real content surrounds it in the same file. Never installs a block that isn't already
+// there - doctor only refreshes, it never adds.
+export function refreshPointerBlock(filePath: string): PointerBlockRefreshResult {
+  if (!existsSync(filePath)) return 'missing-file';
+
+  const content = readFileSync(filePath, 'utf-8');
+  const startIdx = content.indexOf(START_MARKER);
+  const endIdx = content.indexOf(END_MARKER);
+  if (startIdx === -1 || endIdx === -1) return 'not-installed';
+
+  const endOfBlock = endIdx + END_MARKER.length;
+  const newContent = `${content.slice(0, startIdx)}${POINTER_BLOCK}${content.slice(endOfBlock)}`;
+  if (newContent === content) return 'unchanged';
+
+  writeFileSync(filePath, newContent);
+  return 'refreshed';
+}
+
 const NATIVE_FILES = ['AGENTS.md', 'GEMINI.md'];
 
 export function installPointerAdapters(projectRoot: string): void {

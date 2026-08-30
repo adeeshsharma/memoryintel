@@ -2,8 +2,9 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { STARTER_FILES, MENTAL_MODEL_STARTER } from '../templates/starterFiles.js';
 import { installPointerAdapters } from '../adapters/genericPointer.js';
+import { hashContent, setGeneratedFileHash } from '../core/generatedFileHashes.js';
 
-const INSTRUCTIONS_TEMPLATE = `# Memory Intel Instructions
+export const INSTRUCTIONS_TEMPLATE = `# Memory Intel Instructions
 
 This project uses Memory Intel. Read this file at the start of every session.
 
@@ -140,8 +141,15 @@ export function runInit(targetDir: string): void {
   const root = join(targetDir, '.memoryintel');
   mkdirSync(root, { recursive: true });
 
-  ensureFile(join(root, 'instructions.md'), INSTRUCTIONS_TEMPLATE);
   ensureFile(join(root, 'memory-config.json'), JSON.stringify({ initializedAt: new Date().toISOString(), version: '0.1.0' }, null, 2) + '\n');
+
+  const instructionsPath = join(root, 'instructions.md');
+  const instructionsIsNew = !existsSync(instructionsPath);
+  ensureFile(instructionsPath, INSTRUCTIONS_TEMPLATE);
+  if (instructionsIsNew) {
+    setGeneratedFileHash(root, 'instructions.md', hashContent(INSTRUCTIONS_TEMPLATE));
+  }
+
   ensureFile(join(root, 'memory-index.json'), '{}\n');
   ensureFile(join(root, 'memory-events.jsonl'), '');
 

@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { runInit } from '../../src/commands/init.js';
+import { getGeneratedFileHash } from '../../src/core/generatedFileHashes.js';
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'mi-init-')); });
@@ -74,6 +76,24 @@ describe('runInit', () => {
     expect(instructions).toContain('`create-section`');
     // The quoting/escaping rule an agent must get right to produce a parseable plan.
     expect(instructions).toContain('""');
+  });
+
+  it('seeds generatedFileHashes for instructions.md the moment it is freshly written', () => {
+    runInit(dir);
+    const root = join(dir, '.memoryintel');
+    const instructionsContent = readFileSync(join(root, 'instructions.md'), 'utf-8');
+    const expectedHash = createHash('sha256').update(instructionsContent, 'utf-8').digest('hex');
+    expect(getGeneratedFileHash(root, 'instructions.md')).toBe(expectedHash);
+  });
+
+  it('does not touch an already-recorded hash when instructions.md already existed', () => {
+    runInit(dir);
+    const root = join(dir, '.memoryintel');
+    // Simulate a project that predates hash-tracking: hand-written config with no
+    // generatedFileHashes key, plus an instructions.md already on disk.
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ initializedAt: 'x', version: '0.1.0' }));
+    runInit(dir); // re-run - instructions.md already exists, so this must be a no-op for hashing too
+    expect(getGeneratedFileHash(root, 'instructions.md')).toBeUndefined();
   });
 
   it('installs all adapters when they are healthy', () => {

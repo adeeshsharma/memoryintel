@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.0.2...memoryintel-v1.1.0) (2026-08-30)
+
+
+### Features
+
+* memoryintel doctor - refresh generated files on existing projects ([#7](https://github.com/adeeshsharma/memoryintel/issues/7)) ([8be4cdc](https://github.com/adeeshsharma/memoryintel/commit/8be4cdcba2f9422d994004d55460c1c501780928))
+
 ## [1.0.2](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.0.1...memoryintel-v1.0.2) (2026-08-30)
 
 

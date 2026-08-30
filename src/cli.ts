@@ -12,6 +12,7 @@ import { runScan } from './commands/scan.js';
 import { runCheckStop } from './adapters/claudeCode.js';
 import { runDashboardEnable, runDashboardDisable } from './commands/dashboardToggle.js';
 import { runDaemonStart } from './commands/daemonStart.js';
+import { runDoctor } from './commands/doctor.js';
 
 export interface DispatchResult {
   exitCode: number;
@@ -32,7 +33,10 @@ Commands:
   status                   Print a human-readable summary of current memory state
   check-stop               Stop-hook check: emit a JSON allow/block decision
   dashboard <enable|disable>  Turn the shared local dashboard on or off
-  daemon start             Run the dashboard daemon in the foreground (usually auto-started)
+  doctor [--force]         Refresh memoryintel's own generated files (instructions.md, pointer
+                           blocks) to the current template wherever it's provably safe;
+                           --force also overwrites instructions.md when it isn't
+  daemon start              Run the dashboard daemon in the foreground (usually auto-started)
 
 An update-plan row may set kind=compress to compact an oversized section; update() only applies
 such a row when its target file is currently git-clean.
@@ -71,6 +75,12 @@ export function dispatch(argv: string[]): DispatchResult {
       if (!root) return { exitCode: 0, stdout: '', stderr: '' };
       const result = runCheckStop(root);
       return { exitCode: 0, stdout: JSON.stringify(result) + '\n', stderr: '' };
+    }
+    case 'doctor': {
+      const root = findMemoryIntelRoot(process.cwd());
+      if (!root) return { exitCode: 1, stdout: '', stderr: 'No .memoryintel/ found.\n' };
+      const force = argv.includes('--force');
+      return { exitCode: 0, stdout: runDoctor(root, { force }), stderr: '' };
     }
     case 'dashboard': {
       const sub = argv[1];

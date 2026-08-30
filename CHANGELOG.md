@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.0...memoryintel-v1.1.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* spell out the exact TOON update-plan syntax in generated instructions.md ([#6](https://github.com/adeeshsharma/memoryintel/issues/6)) ([5556d32](https://github.com/adeeshsharma/memoryintel/commit/5556d329947479bf7572291af4cf7a21ed4b20e3))
+
 ## [1.1.0](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.0.2...memoryintel-v1.1.0) (2026-08-30)
 
 

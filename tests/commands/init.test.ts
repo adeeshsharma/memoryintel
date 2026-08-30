@@ -62,6 +62,20 @@ describe('runInit', () => {
     expect(instructions).toContain('memoryintel dashboard enable');
   });
 
+  it('spells out the exact TOON syntax an agent needs, since it has no access to this repo\'s own source', () => {
+    runInit(dir);
+    const instructions = readFileSync(join(dir, '.memoryintel', 'instructions.md'), 'utf-8');
+    // The literal header shape update() actually parses (see core/toon.ts's decodeToonTable).
+    expect(instructions).toContain('items[');
+    expect(instructions).toContain('file,action,section,content,reason');
+    // All three real action values, spelled out - not just "action" as a bare noun.
+    expect(instructions).toContain('`append`');
+    expect(instructions).toContain('`replace`');
+    expect(instructions).toContain('`create-section`');
+    // The quoting/escaping rule an agent must get right to produce a parseable plan.
+    expect(instructions).toContain('""');
+  });
+
   it('installs all adapters when they are healthy', () => {
     runInit(dir);
     expect(existsSync(join(dir, 'AGENTS.md'))).toBe(true);

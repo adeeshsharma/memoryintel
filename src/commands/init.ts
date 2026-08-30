@@ -40,6 +40,28 @@ section, content, reason), write it to a file, and run \`memoryintel update <pla
 nothing piped to stdin fails (there is no plan to apply). Reuse exact existing heading names from
 the manifest \`load\` gave you. If nothing meaningful changed, do nothing — do not call \`update\`.
 
+**The exact TOON format \`update\` expects** - this is the one place a malformed plan fails
+outright rather than degrading gracefully, so match it exactly rather than improvising:
+
+    items[2]{file,action,section,content,reason}:
+      "path/to/file.md","append","Section Heading","New paragraph to add.","Why this changed"
+      "path/to/other.md","create-section","New Heading","Content, comma and all.","Why"
+
+- The header line is literal: \`items[\`, the row count, \`]{\`, the field names in this exact
+  order and spelling (\`file,action,section,content,reason\` - add \`,kind\` only for a compaction
+  row, see "Compaction" below), \`}:\`. The row count MUST equal the number of rows that follow, or
+  \`update\` rejects the whole plan with nothing applied.
+- \`action\` is exactly one of three values: \`append\` (add to the end of an existing section's
+  content), \`replace\` (overwrite the section's entire content), or \`create-section\` (add a new
+  \`##\` heading if it doesn't already exist - degrades to a plain \`append\` if it does).
+- Each row is comma-separated fields in that same header order, indented two spaces.
+- **Quote a field in double quotes whenever its content contains a comma, a double quote, a
+  newline, or starts with whitespace** - leave every other field unquoted. Double any literal
+  \`"\` inside a quoted field (\`"\` becomes \`""\`). A quoted field may span multiple physical lines.
+  Example: content \`He said "hi", then left\` must be written as \`"He said ""hi"", then left"\`.
+- \`context/currentMentalModel.md\` is the one exception to \`action\`: its row's \`content\` replaces
+  the file's entire content verbatim, regardless of what \`action\`/\`section\` say.
+
 Also include a row for \`context/currentMentalModel.md\` whenever the update is more than a small,
 localized fact — anything that shifts what the project *is* or where it currently stands (not
 every single decision/progress entry needs one). Unlike every other file, it is a **whole-file

@@ -59,6 +59,24 @@ on a real project: a "known limitation, deliberately left unfixed" entry was sti
 \`currentMentalModel.md\`, but never reconciled against the older, now-wrong decisions entry right
 next to it.
 
+## Committing \`.memoryintel/\` itself
+\`.memoryintel/\` is a normal, git-committed part of the project — \`memoryintel update\` only writes
+files to disk, it never runs git for you. After a successful \`update\`, commit \`.memoryintel/\`'s
+changes yourself, ideally in the same commit as (or immediately after) whatever code change
+prompted the update, so it travels with the same commit/PR automatically instead of being left
+behind as an uncommitted diff.
+
+This matters most in a git worktree, a container, or any other isolated checkout: an uncommitted
+\`.memoryintel/\` change only exists in that one working directory. Merging a feature branch's PR and
+pulling the primary checkout up to date only brings memory updates along if they were actually
+committed first, the same as any other file — there is nothing worktree-specific about the
+mechanism itself, only that a worktree's own uncommitted state is easier to lose track of, since it
+is invisible everywhere else once the session ends and that directory stops being looked at. Found
+on a real project: a full feature built end-to-end in a worktree, with real, meaningful
+architecture changes throughout, reached a merged PR with \`.memoryintel/\` never once updated or
+committed — not because updating was hard, but because nothing in the session ever came back to it
+before the worktree's job was considered done.
+
 ## Compaction
 A file marked \`status: over\` in \`load\`'s manifest has grown past its configured line ceiling.
 This is a signal, not a command — compact it only when it's a sensible moment to (the same

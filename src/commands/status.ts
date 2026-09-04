@@ -5,8 +5,13 @@ import { readIndex } from '../core/memoryIndex.js';
 export function runStatus(root: string): string {
   const lines: string[] = [];
 
+  // Always first: silently reading the wrong project's (or wrong worktree/branch's) memory
+  // has happened in practice - findMemoryIntelRoot() walks up from cwd with no built-in
+  // visibility into which root it actually resolved.
+  lines.push('=== Root ===', root);
+
   const mentalModelPath = join(root, 'context', 'currentMentalModel.md');
-  lines.push('=== Current Mental Model ===');
+  lines.push('', '=== Current Mental Model ===');
   lines.push(existsSync(mentalModelPath) ? readFileSync(mentalModelPath, 'utf-8').trim() : '(none)');
 
   lines.push('', '=== Memory Index ===');

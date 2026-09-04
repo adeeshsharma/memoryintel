@@ -57,6 +57,24 @@ describe('runLoad', () => {
     expect(output).toContain('Overview');
   });
 
+  it('prints the resolved .memoryintel/ root, so loading from the wrong directory is visible rather than silent', () => {
+    const output = runLoad(base);
+    expect(output).toContain(`root: ${root}`);
+  });
+
+  it('includes each loaded file\'s lastUpdated from the memory index in the manifest', () => {
+    writeFileSync(join(root, 'memory-index.json'), JSON.stringify({
+      'context/currentMentalModel.md': { lastUpdated: '2026-08-20T10:00:00.000Z', summary: 'x' }
+    }));
+    const output = runLoad(base);
+    expect(output).toContain('2026-08-20T10:00:00.000Z');
+  });
+
+  it('reports "never" for a loaded file with no memory index entry yet', () => {
+    const output = runLoad(base);
+    expect(output).toContain('never');
+  });
+
   it('flags a file over its compression ceiling in the manifest', () => {
     writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingLines: 2 } }));
     const output = runLoad(base);

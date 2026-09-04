@@ -33,4 +33,8 @@ describe('runStatus', () => {
   it('includes the most recent event', () => {
     expect(runStatus(root)).toContain('memory-update');
   });
+
+  it('includes the resolved root, so a wrong-directory status is visible rather than silent', () => {
+    expect(runStatus(root)).toContain(root);
+  });
 });

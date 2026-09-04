@@ -7,6 +7,7 @@ import { getCeilingLines, countLines } from '../core/compressionConfig.js';
 import { ensureDaemonRunning } from '../daemon/lifecycle.js';
 import { upsertRegistryEntry } from '../daemon/registry.js';
 import { appendEvent } from '../core/eventLog.js';
+import { readIndex } from '../core/memoryIndex.js';
 
 const ALWAYS_LOAD = ['context/currentMentalModel.md', 'context/activeContext.md'];
 
@@ -49,6 +50,11 @@ export function runLoad(cwd: string, domain?: string): string {
   const files = [...ALWAYS_LOAD, ...(domain ? DOMAIN_FILES[domain as Domain] : [])];
   const sections: string[] = [];
   const manifestRows: Record<string, string>[] = [];
+  // `status` already surfaces lastUpdated from this same index - `load` is the one command
+  // instructions.md tells every session to run FIRST, though, and previously gave zero signal
+  // for "just updated" vs. "nobody has touched this in months" without a separate `status`
+  // call nothing prompts an agent to make.
+  const index = readIndex(join(root, 'memory-index.json'));
 
   for (const relFile of files) {
     const absPath = join(root, relFile);
@@ -63,7 +69,8 @@ export function runLoad(cwd: string, domain?: string): string {
       headings: extractHeadings(content).join('|'),
       lines: String(lines),
       ceiling: String(ceiling),
-      status
+      status,
+      lastUpdated: index[relFile]?.lastUpdated ?? 'never'
     });
   }
 

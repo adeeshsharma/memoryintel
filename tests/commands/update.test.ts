@@ -50,6 +50,17 @@ describe('runUpdate', () => {
     expect(JSON.parse(events[0]).summary).toBe('new auth flow');
   });
 
+  it('applies a plan given as a JSON array, identically to the equivalent TOON plan', async () => {
+    const plan = JSON.stringify([
+      { file: 'technical/architecture.md', action: 'append', section: 'Overview', content: 'JWT refresh added', reason: 'new auth flow' }
+    ]);
+    const result = await runUpdate(root, plan);
+    expect(result.applied).toEqual(['technical/architecture.md']);
+
+    const content = readFileSync(join(root, 'technical', 'architecture.md'), 'utf-8');
+    expect(content).toContain('JWT refresh added');
+  });
+
   it('fully overwrites currentMentalModel.md regardless of action/section', async () => {
     const plan = encodeToonTable([
       { file: 'context/currentMentalModel.md', action: 'replace', section: '', content: 'brand new mental model', reason: 'session summary' }

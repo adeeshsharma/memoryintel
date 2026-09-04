@@ -78,6 +78,13 @@ describe('runInit', () => {
     expect(instructions).toContain('""');
   });
 
+  it('documents the JSON alternative to hand-written TOON for update-plans', () => {
+    runInit(dir);
+    const instructions = readFileSync(join(dir, '.memoryintel', 'instructions.md'), 'utf-8');
+    expect(instructions).toMatch(/JSON array/);
+    expect(instructions).toContain('JSON.stringify');
+  });
+
   it('seeds generatedFileHashes for instructions.md the moment it is freshly written', () => {
     runInit(dir);
     const root = join(dir, '.memoryintel');

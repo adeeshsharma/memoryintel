@@ -63,6 +63,14 @@ outright rather than degrading gracefully, so match it exactly rather than impro
 - \`context/currentMentalModel.md\` is the one exception to \`action\`: its row's \`content\` replaces
   the file's entire content verbatim, regardless of what \`action\`/\`section\` say.
 
+**\`update\` also accepts a plain JSON array of the same rows instead of TOON**, auto-detected by
+whether the file/stdin content starts with \`[\` or \`{\` after trimming - if you'd rather
+\`JSON.stringify\` a plan than hand-write TOON's quoting rule above, this is the safer default:
+\`[{"file": "path/to/file.md", "action": "append", "section": "Section Heading", "content": "New
+paragraph to add.", "reason": "Why this changed"}]\`. Same fields, same required order doesn't
+matter (JSON is keyed, not positional), same \`context/currentMentalModel.md\` exception. Neither
+format is preferred - use whichever you're less likely to get wrong.
+
 Also include a row for \`context/currentMentalModel.md\` whenever the update is more than a small,
 localized fact — anything that shifts what the project *is* or where it currently stands (not
 every single decision/progress entry needs one). Unlike every other file, it is a **whole-file

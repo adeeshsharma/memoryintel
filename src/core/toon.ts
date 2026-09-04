@@ -56,7 +56,10 @@ function parseCsvRows(text: string): string[][] {
   }
 
   if (inQuotes) {
-    throw new Error('Malformed TOON table: unterminated quoted field.');
+    // rows.length is exactly how many COMPLETE rows were parsed before the failure - the
+    // failing row is the next one, at that same 0-indexed position (matching how a
+    // field-count-mismatch error below reports rowIndex).
+    throw new Error(`Malformed TOON table: unterminated quoted field in row ${rows.length}.`);
   }
   if (rowStarted) endRow();
 
@@ -111,4 +114,65 @@ export function decodeToonTable(text: string): Record<string, string>[] {
     fields.forEach((f, idx) => { row[f] = values[idx]; });
     return row;
   });
+}
+
+const REQUIRED_PLAN_ROW_FIELDS = ['file', 'action', 'section', 'content', 'reason'] as const;
+const OPTIONAL_PLAN_ROW_FIELDS = ['kind'] as const;
+
+function decodeJsonPlan(text: string): Record<string, string>[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Malformed JSON plan: ${message}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error('Malformed JSON plan: expected an array of rows.');
+  }
+
+  return parsed.map((row, rowIndex) => {
+    if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+      throw new Error(`Malformed JSON plan: row ${rowIndex} must be an object.`);
+    }
+    const record = row as Record<string, unknown>;
+    for (const field of REQUIRED_PLAN_ROW_FIELDS) {
+      if (!(field in record)) {
+        throw new Error(`Malformed JSON plan: row ${rowIndex} is missing required field "${field}".`);
+      }
+    }
+    const result: Record<string, string> = {};
+    for (const field of [...REQUIRED_PLAN_ROW_FIELDS, ...OPTIONAL_PLAN_ROW_FIELDS]) {
+      if (!(field in record)) continue;
+      const value = record[field];
+      if (typeof value !== 'string') {
+        throw new Error(`Malformed JSON plan: row ${rowIndex}'s "${field}" must be a string.`);
+      }
+      result[field] = value;
+    }
+    return result;
+  });
+}
+
+/**
+ * Accepts either format update() itself needs to parse: TOON text (the
+ * default, more compact for a human/agent to scan), or a JSON array of the
+ * same row shape - auto-detected by a leading '[' after trimming, since a
+ * real TOON header always starts with the literal 'items['; this can never
+ * misfire on a genuinely malformed TOON table. JSON exists specifically so
+ * an agent that would rather JSON.stringify a plan than hand-author TOON's
+ * own quoting rules (double an internal '"' as '""', not backslash-escape
+ * it - a real, repeated mistake in practice, not hypothetical) never has to
+ * risk getting that escaping wrong at all. decodeToonTable itself is
+ * unchanged and still exported directly for anyone who wants TOON
+ * specifically.
+ */
+export function decodePlanRows(text: string): Record<string, string>[] {
+  const trimmed = text.trimStart();
+  // A real TOON header never starts with '[' or '{' either (always the literal
+  // 'items[') - catching '{' too means a plan mistakenly wrapped as a single
+  // object instead of an array gets the clear "expected an array" error below,
+  // not an unrelated, confusing TOON header error.
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) return decodeJsonPlan(trimmed);
+  return decodeToonTable(text);
 }

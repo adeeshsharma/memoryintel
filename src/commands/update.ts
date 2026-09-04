@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join, posix, dirname } from 'node:path';
-import { decodeToonTable } from '../core/toon.js';
+import { decodePlanRows } from '../core/toon.js';
 import { applySectionUpdate, isNearDuplicate, getSectionContent } from '../core/sectionWriter.js';
 import { assertSafePath } from '../core/pathSafety.js';
 import { upsertIndexEntry } from '../core/memoryIndex.js';
@@ -33,7 +33,7 @@ export async function runUpdate(root: string, planText: string): Promise<{ appli
     // Dashboard visibility is best-effort — never let it break `update`.
   }
 
-  const rows = decodeToonTable(planText) as unknown as PlanRow[];
+  const rows = decodePlanRows(planText) as unknown as PlanRow[];
 
   return withLock(join(root, '.lock'), () => {
     // Phase 1: validate every entry against current disk state, compute the writes, write nothing yet.

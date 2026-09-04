@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encodeToonTable, decodeToonTable } from '../../src/core/toon.js';
+import { encodeToonTable, decodeToonTable, decodePlanRows } from '../../src/core/toon.js';
 
 describe('encodeToonTable / decodeToonTable', () => {
   it('round-trips a simple table', () => {
@@ -62,5 +62,49 @@ describe('encodeToonTable / decodeToonTable', () => {
   it('throws on an unterminated quoted field instead of silently truncating', () => {
     const malformed = 'items[1]{file,content}:\n  a.md,"never closed\n';
     expect(() => decodeToonTable(malformed)).toThrow(/unterminated quoted field/);
+  });
+
+  it('names which row an unterminated quoted field was found in', () => {
+    const malformed = 'items[2]{file,content}:\n  a.md,fine\n  b.md,"never closed\n';
+    expect(() => decodeToonTable(malformed)).toThrow(/unterminated quoted field.*row 1/);
+  });
+});
+
+describe('decodePlanRows', () => {
+  it('decodes TOON input exactly like decodeToonTable', () => {
+    const rows = [{ file: 'a.md', action: 'append', section: 'X', content: 'c', reason: 'r' }];
+    expect(decodePlanRows(encodeToonTable(rows))).toEqual(rows);
+  });
+
+  it('decodes a JSON array of the same row shape, auto-detected by a leading [', () => {
+    const rows = [
+      { file: 'a.md', action: 'append', section: 'X', content: 'has "quotes", commas\nand a newline', reason: 'r1' },
+      { file: 'b.md', action: 'replace', section: 'Y', content: 'plain', reason: 'r2' }
+    ];
+    expect(decodePlanRows(JSON.stringify(rows))).toEqual(rows);
+  });
+
+  it('tolerates leading whitespace before the JSON array when detecting the format', () => {
+    const rows = [{ file: 'a.md', action: 'append', section: 'X', content: 'c', reason: 'r' }];
+    expect(decodePlanRows(`   \n${JSON.stringify(rows)}`)).toEqual(rows);
+  });
+
+  it('preserves the optional kind field on a JSON row', () => {
+    const rows = [{ file: 'a.md', action: 'replace', section: 'X', content: 'c', reason: 'r', kind: 'compress' }];
+    expect(decodePlanRows(JSON.stringify(rows))).toEqual(rows);
+  });
+
+  it('throws a clear error when the JSON input is not an array', () => {
+    expect(() => decodePlanRows('{"file":"a.md"}')).toThrow(/expected an array of rows/);
+  });
+
+  it('throws a clear, row-located error when a JSON row is missing a required field', () => {
+    const malformed = JSON.stringify([{ file: 'a.md', action: 'append', section: 'X', content: 'c' }]);
+    expect(() => decodePlanRows(malformed)).toThrow(/row 0.*missing required field "reason"/);
+  });
+
+  it('throws a clear, row-located error when a JSON row has a non-string field', () => {
+    const malformed = JSON.stringify([{ file: 'a.md', action: 'append', section: 'X', content: 'c', reason: 5 }]);
+    expect(() => decodePlanRows(malformed)).toThrow(/row 0.*"reason" must be a string/);
   });
 });

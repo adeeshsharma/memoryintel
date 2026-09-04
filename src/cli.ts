@@ -154,12 +154,14 @@ async function main(): Promise<void> {
       // generic "Malformed TOON table header" error - true, but useless for figuring out what
       // actually went wrong. This is the one case worth naming explicitly before it gets there.
       if (planText.trim().length === 0) {
-        process.stderr.write('memoryintel: No update-plan given. Pass a TOON plan file (`memoryintel update <path>`) or pipe TOON content via stdin. See .memoryintel/instructions.md for the update-plan format.\n');
+        process.stderr.write('memoryintel: No update-plan given. Pass a plan file (TOON or JSON, `memoryintel update <path>`) or pipe it via stdin. See .memoryintel/instructions.md for the update-plan format.\n');
         process.exitCode = 1;
         return;
       }
       const result = await runUpdate(root, planText);
-      process.stdout.write(`Applied: ${result.applied.join(', ') || '(none)'}\nSkipped: ${result.skipped.join(', ') || '(none)'}\n`);
+      // root printed first, same reasoning as load/status: a wrong-directory update should
+      // never be silent.
+      process.stdout.write(`root: ${root}\nApplied: ${result.applied.join(', ') || '(none)'}\nSkipped: ${result.skipped.join(', ') || '(none)'}\n`);
       process.exitCode = 0;
       return;
     }

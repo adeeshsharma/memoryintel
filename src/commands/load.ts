@@ -84,5 +84,10 @@ export function runLoad(cwd: string, domain?: string): string {
   }
 
   const manifest = encodeToonTable(manifestRows);
-  return `${manifest}\n${sections.join('\n')}`;
+  // A leading, plainly-labeled root line - silently loading the wrong project's (or wrong
+  // worktree/branch's) memory has happened in practice: findMemoryIntelRoot() walks up from
+  // cwd with no built-in visibility into which root it actually found, so confidently-wrong
+  // content came back with nothing to flag it. This is always the first thing printed,
+  // whether or not --domain is given.
+  return `root: ${root}\n${manifest}\n${sections.join('\n')}`;
 }

@@ -57,6 +57,11 @@ describe('runLoad', () => {
     expect(output).toContain('Overview');
   });
 
+  it('prints the resolved .memoryintel/ root, so loading from the wrong directory is visible rather than silent', () => {
+    const output = runLoad(base);
+    expect(output).toContain(`root: ${root}`);
+  });
+
   it('flags a file over its compression ceiling in the manifest', () => {
     writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingLines: 2 } }));
     const output = runLoad(base);

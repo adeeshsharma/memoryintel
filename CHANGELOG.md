@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.1...memoryintel-v1.1.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* JSON plan input and visible root resolution ([#10](https://github.com/adeeshsharma/memoryintel/issues/10)) ([6620f0a](https://github.com/adeeshsharma/memoryintel/commit/6620f0a7e32ffb30bc4bde547326b40f0ab27cd2))
+
 ## [1.1.1](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.0...memoryintel-v1.1.1) (2026-08-30)
 
 

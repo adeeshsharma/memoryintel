@@ -102,6 +102,40 @@ describe('built binary: update end-to-end', () => {
     expect(JSON.parse(events).type).toBe('memory-update');
   });
 
+  // update's plan-file argument lives in main(), not dispatch() - the only path that spawns the
+  // real binary and can observe --root's positional-stripping logic (argv.filter over --root and
+  // its value) actually working end to end, not just in isolation.
+  it('applies a plan given via --root while cwd is a different, unrelated directory', () => {
+    runInit(projectDir);
+    const unrelatedDir = mkdtempSync(join(tmpdir(), 'mi-bin-root-elsewhere-'));
+    try {
+      const archPath = join(projectDir, '.memoryintel', 'technical', 'architecture.md');
+      const planPath = join(projectDir, 'plan.toon');
+      writeFileSync(planPath, encodeToonTable([
+        {
+          file: 'technical/architecture.md',
+          action: 'append',
+          section: 'Overview',
+          content: 'Applied via --root from an unrelated cwd',
+          reason: '--root regression test'
+        }
+      ]));
+
+      const result = spawnSync(process.execPath, [CLI, 'update', '--root', projectDir, planPath], {
+        cwd: unrelatedDir,
+        encoding: 'utf-8',
+        maxBuffer: BIG
+      });
+      expect(result.stderr).toBe('');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(`root: ${projectDir}`);
+      expect(result.stdout).toContain('Applied: technical/architecture.md');
+      expect(readFileSync(archPath, 'utf-8')).toContain('Applied via --root from an unrelated cwd');
+    } finally {
+      rmSync(unrelatedDir, { recursive: true, force: true });
+    }
+  });
+
   it('reports a missing plan file as a one-line error, not a stack trace', () => {
     runInit(projectDir);
     const result = run(['update', join(projectDir, 'does-not-exist.toon')]);

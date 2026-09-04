@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findMemoryIntelRoot } from './core/discovery.js';
 import { runUpdate } from './commands/update.js';
@@ -13,6 +13,27 @@ import { runCheckStop } from './adapters/claudeCode.js';
 import { runDashboardEnable, runDashboardDisable } from './commands/dashboardToggle.js';
 import { runDaemonStart } from './commands/daemonStart.js';
 import { runDoctor } from './commands/doctor.js';
+
+// Every command below that resolves .memoryintel/ by walking up from a starting directory
+// previously always used process.cwd() with no override - meaning a long, multi-project
+// session had to religiously `cd` before every single call, with silently-wrong output the
+// only feedback for getting it wrong (mitigated separately by printing the resolved root, but
+// that only helps you NOTICE the mistake, not avoid making it). --root <path> lets a caller
+// that already knows its target project say so directly; MEMORYINTEL_ROOT is the same thing
+// as an env var, for a session-start hook or similar context where passing an extra CLI flag
+// isn't convenient. --root wins when both are given. Either way this is resolved exactly like
+// process.cwd() always was - a starting point findMemoryIntelRoot() walks up from, not
+// required to already BE the exact .memoryintel directory itself.
+function resolveStartDir(argv: string[]): string {
+  const rootFlagIndex = argv.indexOf('--root');
+  if (rootFlagIndex !== -1 && argv[rootFlagIndex + 1]) {
+    return resolve(process.cwd(), argv[rootFlagIndex + 1]);
+  }
+  if (process.env.MEMORYINTEL_ROOT) {
+    return resolve(process.cwd(), process.env.MEMORYINTEL_ROOT);
+  }
+  return process.cwd();
+}
 
 export interface DispatchResult {
   exitCode: number;
@@ -62,22 +83,22 @@ export function dispatch(argv: string[]): DispatchResult {
     case 'load': {
       const domainFlagIndex = argv.indexOf('--domain');
       const domain = domainFlagIndex !== -1 ? argv[domainFlagIndex + 1] : undefined;
-      const output = runLoad(process.cwd(), domain);
+      const output = runLoad(resolveStartDir(argv), domain);
       return { exitCode: 0, stdout: output, stderr: '' };
     }
     case 'status': {
-      const root = findMemoryIntelRoot(process.cwd());
+      const root = findMemoryIntelRoot(resolveStartDir(argv));
       if (!root) return { exitCode: 1, stdout: '', stderr: 'No .memoryintel/ found.\n' };
       return { exitCode: 0, stdout: runStatus(root), stderr: '' };
     }
     case 'check-stop': {
-      const root = findMemoryIntelRoot(process.cwd());
+      const root = findMemoryIntelRoot(resolveStartDir(argv));
       if (!root) return { exitCode: 0, stdout: '', stderr: '' };
       const result = runCheckStop(root);
       return { exitCode: 0, stdout: JSON.stringify(result) + '\n', stderr: '' };
     }
     case 'doctor': {
-      const root = findMemoryIntelRoot(process.cwd());
+      const root = findMemoryIntelRoot(resolveStartDir(argv));
       if (!root) return { exitCode: 1, stdout: '', stderr: 'No .memoryintel/ found.\n' };
       const force = argv.includes('--force');
       return { exitCode: 0, stdout: runDoctor(root, { force }), stderr: '' };
@@ -140,13 +161,18 @@ async function main(): Promise<void> {
     }
 
     if (command === 'update') {
-      const root = findMemoryIntelRoot(process.cwd());
+      const root = findMemoryIntelRoot(resolveStartDir(argv));
       if (!root) {
         process.stderr.write('No .memoryintel/ found.\n');
         process.exitCode = 1;
         return;
       }
-      const source = argv[1] ?? '-';
+      // The plan-file path is the first REMAINING positional argument after stripping the
+      // command name itself and a --root <path> pair, if given - otherwise "--root"'s own
+      // value would get misread as the plan-file path.
+      const rootFlagIndex = argv.indexOf('--root');
+      const positional = argv.filter((_, i) => i !== 0 && i !== rootFlagIndex && i !== rootFlagIndex + 1);
+      const source = positional[0] ?? '-';
       const planText = source === '-' ? readFileSync(0, 'utf-8') : readFileSync(source, 'utf-8');
       // Caught live: an agent ran bare `memoryintel update` (no plan-file argument, no piped
       // stdin) as a one-shot Bash tool call. `source` defaulted to '-' (read stdin), stdin was

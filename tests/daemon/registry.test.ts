@@ -20,26 +20,17 @@ afterEach(() => {
 });
 
 describe('detectToolsWired', () => {
-  // Claude Code automation ships via this package's own plugin (hooks/hooks.json) - init never
-  // writes .claude/settings.json (see src/commands/init.ts). This still-supported check is for
-  // someone who wired a command by hand; it's not how a real project ends up wired.
-  it('detects claude-code when settings.json references memoryintel load', () => {
-    mkdirSync(join(projectRoot, '.claude'), { recursive: true });
-    writeFileSync(join(projectRoot, '.claude', 'settings.json'), JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'memoryintel load' }] }] } }));
-    expect(detectToolsWired(projectRoot)).toContain('claude-code');
-  });
-
-  // The real-world path: nothing ever writes .claude/settings.json, so this is the only signal
-  // that actually fires for a project using the documented plugin-based setup. Confirmed on a
-  // real project (distilled-docs): claude-code never appeared in the dashboard despite Claude
-  // driving the entire build, because the settings.json check could never be true in practice.
-  it('detects claude-code from .session-marker.json when no settings.json exists', () => {
+  // Claude Code automation ships via this package's own plugin (hooks/hooks.json), never by
+  // writing to a project's .claude/settings.json - init never touches that file. The Stop hook's
+  // .session-marker.json existing is real evidence the plugin has actually fired for this
+  // project, which is the only signal detectToolsWired uses.
+  it('detects claude-code from .session-marker.json', () => {
     mkdirSync(join(projectRoot, '.memoryintel'), { recursive: true });
     writeFileSync(join(projectRoot, '.memoryintel', '.session-marker.json'), JSON.stringify({ lastFlaggedDiffSignature: null }));
     expect(detectToolsWired(projectRoot)).toContain('claude-code');
   });
 
-  it('does not report claude-code when neither settings.json nor a session marker exists', () => {
+  it('does not report claude-code when no session marker exists', () => {
     expect(detectToolsWired(projectRoot)).not.toContain('claude-code');
   });
 

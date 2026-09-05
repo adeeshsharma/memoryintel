@@ -95,6 +95,33 @@ export function applySectionUpdate(markdown: string, section: string, action: Se
   return result.endsWith('\n') ? result : result + '\n';
 }
 
+const DUPLICATE_STOPWORDS = new Set([
+  'the', 'and', 'for', 'are', 'was', 'were', 'with', 'this', 'that', 'from', 'have', 'has'
+]);
+
+// Words under 3 chars and common connectors are dropped before comparing - otherwise two
+// sentences sharing only "the", "and", "is" would register as near-duplicates of each other.
+function meaningfulTokens(s: string): string[] {
+  return normalizeHeading(s)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3 && !DUPLICATE_STOPWORDS.has(t));
+}
+
+const TOKEN_OVERLAP_THRESHOLD = 0.85;
+
 export function isNearDuplicate(existingBlock: string, newContent: string): boolean {
-  return normalizeHeading(existingBlock).includes(normalizeHeading(newContent));
+  // Fast path: catches whitespace-only diffs and literal restatements.
+  if (normalizeHeading(existingBlock).includes(normalizeHeading(newContent))) return true;
+
+  // Reordered/lightly-reworded restatements of the same fact aren't a literal substring of the
+  // existing block, so the check above misses them - which is exactly how the same fact
+  // re-enters memory in slightly different words each session, quietly working against
+  // self-compression. Below a handful of meaningful words, overlap ratios get noisy on trivial
+  // content, so short additions fall back to the literal check above only.
+  const newTokens = meaningfulTokens(newContent);
+  if (newTokens.length < 3) return false;
+
+  const existingTokens = new Set(meaningfulTokens(existingBlock));
+  const overlap = newTokens.filter((t) => existingTokens.has(t)).length;
+  return overlap / newTokens.length >= TOKEN_OVERLAP_THRESHOLD;
 }

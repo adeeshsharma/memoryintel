@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runLoad } from '../../src/commands/load.js';
+import { runUpdate } from '../../src/commands/update.js';
+import { encodeToonTable } from '../../src/core/toon.js';
 import { readRegistry } from '../../src/daemon/registry.js';
 
 let base: string;
@@ -76,16 +78,95 @@ describe('runLoad', () => {
   });
 
   it('flags a file over its compression ceiling in the manifest', () => {
-    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingLines: 2 } }));
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingChars: 5 } }));
     const output = runLoad(base);
     expect(output).toContain('over');
   });
 
   it('marks a file under its compression ceiling as under', () => {
-    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingLines: 1000 } }));
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingChars: 100000 } }));
     const output = runLoad(base);
     expect(output).toContain('under');
     expect(output).not.toContain(',over');
+  });
+});
+
+describe('runLoad domain index', () => {
+  it('lists an unloaded domain file by heading, without its content, when no --domain is given', () => {
+    const output = runLoad(base);
+    expect(output).toContain('technical/architecture.md');
+    expect(output).toContain('Overview');
+    expect(output).not.toContain('Microservices');
+  });
+
+  it('omits a domain file from the index once it has actually been loaded', () => {
+    const output = runLoad(base, 'technical');
+    // Still loaded in full (content present)...
+    expect(output).toContain('Microservices');
+    // ...and not duplicated in the "not loaded" index (bounded to before the full file sections,
+    // which legitimately repeat every loaded file's path in their own "--- FILE: ... ---" markers).
+    const indexSection = (output.split('Other memory available')[1] ?? '').split('--- FILE:')[0];
+    expect(indexSection).not.toContain('technical/architecture.md');
+  });
+
+  it('says nothing about unavailable domains when no domain files exist on disk', () => {
+    const emptyBase = mkdtempSync(join(tmpdir(), 'mi-load-nodomain-'));
+    const emptyRoot = join(emptyBase, '.memoryintel');
+    mkdirSync(join(emptyRoot, 'context'), { recursive: true });
+    writeFileSync(join(emptyRoot, 'context', 'currentMentalModel.md'), 'model\n');
+    writeFileSync(join(emptyRoot, 'context', 'activeContext.md'), 'focus\n');
+    const output = runLoad(emptyBase);
+    expect(output).not.toContain('Other memory available');
+    rmSync(emptyBase, { recursive: true, force: true });
+  });
+});
+
+describe('runLoad auto-carried domain', () => {
+  it('automatically includes the domain the last real update() touched, with no --domain given', async () => {
+    const plan = encodeToonTable([
+      { file: 'technical/architecture.md', action: 'append', section: 'Overview', content: 'JWT refresh added', reason: 'auth work' }
+    ]);
+    await runUpdate(root, plan);
+
+    const output = runLoad(base);
+    expect(output).toContain('JWT refresh added');
+  });
+
+  it('an explicit --domain still overrides the auto-carried one', async () => {
+    const plan = encodeToonTable([
+      { file: 'technical/architecture.md', action: 'append', section: 'Overview', content: 'JWT refresh added', reason: 'auth work' }
+    ]);
+    await runUpdate(root, plan);
+
+    const output = runLoad(base, 'business');
+    expect(output).toContain('Launch v1');
+    expect(output).not.toContain('JWT refresh added');
+  });
+
+  it('does not auto-carry a domain when the last update() only touched an always-loaded file', async () => {
+    const plan = encodeToonTable([
+      { file: 'context/currentMentalModel.md', action: 'replace', section: '', content: 'new model', reason: 'session summary' }
+    ]);
+    await runUpdate(root, plan);
+
+    const output = runLoad(base);
+    expect(output).not.toContain('Microservices');
+    expect(output).not.toContain('Launch v1');
+  });
+
+  it('records domainSource: "auto" on an auto-carried load, vs "explicit" on a requested one', async () => {
+    const plan = encodeToonTable([
+      { file: 'technical/architecture.md', action: 'append', section: 'Overview', content: 'noted', reason: 'r' }
+    ]);
+    await runUpdate(root, plan);
+    runLoad(base);
+    runLoad(base, 'technical');
+
+    const events = readFileSync(join(root, 'memory-events.jsonl'), 'utf-8').trim().split('\n').map((l) => JSON.parse(l));
+    const loads = events.filter((e) => e.type === 'session-load');
+    expect(loads[0].domainSource).toBe('auto');
+    expect(loads[0].domain).toBe('technical');
+    expect(loads[1].domainSource).toBe('explicit');
   });
 });
 

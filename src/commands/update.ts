@@ -6,11 +6,12 @@ import { assertSafePath } from '../core/pathSafety.js';
 import { upsertIndexEntry } from '../core/memoryIndex.js';
 import { appendEvent } from '../core/eventLog.js';
 import { atomicWriteFile } from '../core/atomicWrite.js';
-import { withLock } from '../core/lock.js';
+import { withLocks } from '../core/lock.js';
 import { ensureDaemonRunning } from '../daemon/lifecycle.js';
 import { upsertRegistryEntry } from '../daemon/registry.js';
 import { resolveCheckStopMarker } from '../adapters/claudeCode.js';
 import { isPathClean } from '../core/gitPorcelain.js';
+import { getCeilingChars } from '../core/compressionConfig.js';
 
 interface PlanRow {
   file: string;
@@ -21,11 +22,14 @@ interface PlanRow {
   kind?: string;
 }
 
-type EventType = 'memory-update' | 'compression' | 'skipped-duplicate' | 'compression-rejected';
+type EventType = 'memory-update' | 'compression' | 'skipped-duplicate' | 'compression-rejected' | 'over-ceiling';
 
 const MENTAL_MODEL_FILE = 'context/currentMentalModel.md';
 
-export async function runUpdate(root: string, planText: string): Promise<{ applied: string[]; skipped: string[] }> {
+export async function runUpdate(
+  root: string,
+  planText: string
+): Promise<{ applied: string[]; skipped: string[]; overCeiling: string[] }> {
   try {
     ensureDaemonRunning();
     upsertRegistryEntry(dirname(root));
@@ -35,7 +39,12 @@ export async function runUpdate(root: string, planText: string): Promise<{ appli
 
   const rows = decodePlanRows(planText) as unknown as PlanRow[];
 
-  return withLock(join(root, '.lock'), () => {
+  // Locking only the files this plan actually touches (rather than one project-wide lock) lets
+  // two update() calls on disjoint files - e.g. two subagents each owning a different domain -
+  // run concurrently instead of serializing on each other.
+  const lockPaths = [...new Set(rows.map((row) => `${assertSafePath(root, row.file)}.lock`))];
+
+  return withLocks(lockPaths, () => {
     // Phase 1: validate every entry against current disk state, compute the writes, write nothing yet.
     const writes: { absPath: string; relFile: string; newContent: string; reason: string; skipped: boolean; eventType: EventType }[] = [];
 
@@ -98,6 +107,7 @@ export async function runUpdate(root: string, planText: string): Promise<{ appli
     // Phase 2: apply. Every entry above already validated, so this cannot fail on content grounds.
     const applied: string[] = [];
     const skipped: string[] = [];
+    const overCeiling: string[] = [];
 
     for (const w of writes) {
       if (w.skipped) {
@@ -122,9 +132,26 @@ export async function runUpdate(root: string, planText: string): Promise<{ appli
         affectedFiles: [w.relFile]
       });
       applied.push(w.relFile);
+
+      // The compression ceiling used to be purely advisory: `load()` would flag a file as
+      // "over" in its manifest, but nothing surfaced that until the *next* session bothered to
+      // read the manifest. Flagging it here, in the same turn that pushed a file over, means the
+      // agent that just wrote the content is the one told to compress it - the one with the most
+      // context to do so well - rather than leaving it for whoever loads next.
+      const ceiling = getCeilingChars(root, w.relFile);
+      if (w.newContent.length > ceiling) {
+        const reason = `${w.relFile} is ${w.newContent.length} chars, over its ${ceiling}-char ceiling — consider a compress row before the next session.`;
+        appendEvent(join(root, 'memory-events.jsonl'), {
+          timestamp: new Date().toISOString(),
+          type: 'over-ceiling',
+          summary: reason,
+          affectedFiles: [w.relFile]
+        });
+        overCeiling.push(w.relFile);
+      }
     }
 
     resolveCheckStopMarker(root);
-    return { applied, skipped };
+    return { applied, skipped, overCeiling };
   });
 }

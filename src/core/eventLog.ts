@@ -10,6 +10,10 @@ export interface MemoryEvent {
   // the fact from file sizes and guesswork, which is how the first KPI pass on this tool had to
   // be done (see business/roadmap.md).
   domain?: string | null;
+  // Only set on 'session-load' events - distinguishes a domain the agent explicitly asked for
+  // via --domain from one auto-carried forward because the previous update() touched it, so a
+  // dashboard or timeline read can tell which mechanism actually put a domain in context.
+  domainSource?: 'explicit' | 'auto' | null;
   totalChars?: number;
   totalLines?: number;
 }

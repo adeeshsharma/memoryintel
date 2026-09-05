@@ -29,9 +29,16 @@ time. Both commands are safe to run more than once - \`import\`'s already-import
 skipped, not duplicated, and \`scan\` never writes anything at all.
 
 ## Session start
-Run \`memoryintel load [--domain technical|business|research]\` and treat its output as project context.
-Its manifest reports each loaded file's \`lines\`, \`ceiling\`, and \`status\` (\`over\`/\`under\`) — see
-"Compaction" below for what to do about a file marked \`over\`.
+Run \`memoryintel load\` (no arguments — the hook does this automatically) and treat its output as
+project context. Its manifest reports each loaded file's \`lines\`, \`ceiling\`, and \`status\`
+(\`over\`/\`under\`) — see "Compaction" below for what to do about a file marked \`over\`.
+
+\`load\` with no \`--domain\` automatically carries forward whichever domain the most recent
+\`update\` actually touched, so continuing yesterday's technical work loads \`technical/*\` again
+without you having to ask for it. The one case this doesn't cover is deliberately switching to a
+domain nothing was just written to — check the "Other memory available" list at the bottom of
+\`load\`'s output and, if the task is about a topic listed there, run
+\`memoryintel load --domain <domain>\` yourself before continuing.
 
 ## Session end
 If your work changed project understanding (new architecture, feature, decision, integration, or
@@ -130,8 +137,10 @@ recoverable from git history — it just won't be loaded by default anymore. Bec
   your summary can't answer, you compressed too much — keep more.
 
 The ceiling itself is configurable in \`memory-config.json\` under a \`compression\` key
-(\`defaultCeilingLines\`, and optional \`domainOverrides\` keyed by domain, e.g. \`"technical": 500\`)
-— the built-in default is 300 lines if unset.
+(\`defaultCeilingChars\`, and optional \`domainOverrides\` keyed by domain, e.g. \`"technical": 20000\`)
+— the built-in default is 12000 chars if unset. \`update\` also flags a file that crosses the
+ceiling right after the write that pushed it over, in the same turn — don't wait for the next
+\`load\` to notice.
 
 ## Dashboard
 If the user asks to turn off the dashboard/web UI, run \`memoryintel dashboard disable\`. This is a

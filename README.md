@@ -176,7 +176,7 @@ systems: 85–93%), despite solving a different problem (durable project state, 
 history).
 
 **Why the gap widens over time, not just per-call:** `.memoryintel/` content is self-compressing,
-capped at ~300 lines per file by default — load cost stays roughly flat as a project grows. The
+capped at ~12,000 chars per file by default — load cost stays roughly flat as a project grows. The
 no-memory alternative doesn't; it scales with total codebase size. A project one day old and one
 a year old cost about the same to bootstrap with Memory Intel. Without it, the older project costs
 more, every single session.

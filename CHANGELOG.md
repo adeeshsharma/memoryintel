@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.2...memoryintel-v1.1.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* auto-carry domain into load(), char-based ceiling enforcement, reworded-duplicate detection, per-file locking ([#12](https://github.com/adeeshsharma/memoryintel/issues/12)) ([b03da25](https://github.com/adeeshsharma/memoryintel/commit/b03da25bc40cbba96cc896bdc30176633d00c5f7))
+
 ## [1.1.2](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.1...memoryintel-v1.1.2) (2026-09-04)
 
 

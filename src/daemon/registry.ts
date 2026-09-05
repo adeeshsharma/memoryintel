@@ -16,18 +16,15 @@ export function detectToolsWired(projectRoot: string): string[] {
   const tools: string[] = [];
 
   // Claude Code automation comes entirely from this package's bundled plugin
-  // (hooks/hooks.json), never from writing to the project's own .claude/settings.json - init
-  // has never touched that file (see src/commands/init.ts). Checking it here was dead code: it
-  // could never be true for any project using the documented setup, which is why a real project
-  // (distilled-docs) never showed claude-code despite Claude driving every session. The
-  // Stop-hook's `.session-marker.json` (written by check-stop / resolveCheckStopMarker, see
-  // src/adapters/claudeCode.ts) only ever exists once the plugin's Stop hook has actually fired
-  // for this project - real evidence of Claude Code automation running, not just installed.
-  // Still also honor a manually-wired settings.json, for anyone who set one up by hand.
-  const claudeSettingsPath = join(projectRoot, '.claude', 'settings.json');
-  const settingsWired = existsSync(claudeSettingsPath) && readFileSync(claudeSettingsPath, 'utf-8').includes('memoryintel load');
+  // (hooks/hooks.json), never from writing to the project's own .claude/settings.json - init has
+  // never touched that file. The Stop-hook's `.session-marker.json` (written by check-stop /
+  // resolveCheckStopMarker, see src/adapters/claudeCode.ts) only ever exists once the plugin's
+  // Stop hook has actually fired for this project - real evidence of Claude Code automation
+  // running, not just installed. A prior version of this check also looked for a hand-wired
+  // .claude/settings.json; dropped after confirming on a real project (distilled-docs) that
+  // nothing ever writes that file, so the check could never fire in practice.
   const sessionMarkerPath = join(projectRoot, '.memoryintel', '.session-marker.json');
-  if (settingsWired || existsSync(sessionMarkerPath)) {
+  if (existsSync(sessionMarkerPath)) {
     tools.push('claude-code');
   }
 

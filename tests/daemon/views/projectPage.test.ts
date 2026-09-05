@@ -76,9 +76,9 @@ describe('renderProjectPage', () => {
     expect(renderProjectPage(projectRoot)).toContain('claude-code');
   });
 
-  it('shows a lines/ceiling size label for a memory file', () => {
+  it('shows a chars/ceiling size label for a memory file', () => {
     const html = renderProjectPage(projectRoot);
-    expect(html).toMatch(/\d+\/\d+ lines/);
+    expect(html).toMatch(/\d+\/\d+ chars/);
   });
 
   // A day-only staleness label ("0d ago") is indistinguishable for anything updated in the last

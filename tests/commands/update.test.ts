@@ -172,6 +172,39 @@ describe('runUpdate', () => {
     expect(events).toHaveLength(2);
   });
 
+  it('flags a file that crosses its compression ceiling in the same call that pushed it over', async () => {
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingChars: 20 } }));
+    const plan = encodeToonTable([
+      { file: 'technical/architecture.md', action: 'append', section: 'Overview', content: 'a much longer addition that pushes this well past the tiny ceiling', reason: 'r' }
+    ]);
+    const result = await runUpdate(root, plan);
+    expect(result.applied).toEqual(['technical/architecture.md']);
+    expect(result.overCeiling).toEqual(['technical/architecture.md']);
+
+    const events = readFileSync(join(root, 'memory-events.jsonl'), 'utf-8').trim().split('\n').map((l) => JSON.parse(l));
+    const overCeilingEvent = events.find((e) => e.type === 'over-ceiling');
+    expect(overCeilingEvent).toBeDefined();
+    expect(overCeilingEvent.summary).toMatch(/over its 20-char ceiling/);
+  });
+
+  it('does not flag a file that stays under its compression ceiling', async () => {
+    const plan = encodeToonTable([
+      { file: 'technical/architecture.md', action: 'append', section: 'Overview', content: 'short note', reason: 'r' }
+    ]);
+    const result = await runUpdate(root, plan);
+    expect(result.overCeiling).toEqual([]);
+  });
+
+  it('does not flag a skipped-duplicate write as over ceiling', async () => {
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingChars: 1 } }));
+    const plan = encodeToonTable([
+      { file: 'technical/architecture.md', action: 'append', section: 'Overview', content: 'intro', reason: 'no-op' }
+    ]);
+    const result = await runUpdate(root, plan);
+    expect(result.skipped).toEqual(['technical/architecture.md']);
+    expect(result.overCeiling).toEqual([]);
+  });
+
   it('does not skip content as a duplicate when identical text exists only in an unrelated section', async () => {
     writeFileSync(join(root, 'technical', 'architecture.md'), '## Overview\nintro\n## Components\nshared text\n');
     const plan = encodeToonTable([

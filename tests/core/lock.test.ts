@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openSync, closeSync, constants } from 'node:fs';
-import { withLock, withLockSync } from '../../src/core/lock.js';
+import { withLocks, withLockSync } from '../../src/core/lock.js';
 
 let dir: string;
 let lockPath: string;
@@ -13,34 +13,65 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-describe('withLock', () => {
-  it('runs the function and releases the lock afterward', async () => {
-    const result = await withLock(lockPath, () => 42);
+describe('withLocks', () => {
+  it('runs the function and releases a single lock afterward', async () => {
+    const result = await withLocks([lockPath], () => 42);
     expect(result).toBe(42);
     // Lock released — a second call should succeed immediately.
-    const second = await withLock(lockPath, () => 43);
-    expect(second).toBe(43);
+    expect(await withLocks([lockPath], () => 43)).toBe(43);
   });
 
-  it('serializes two concurrent calls instead of racing', async () => {
+  it('acquires every given lock and releases them all afterward', async () => {
+    const lockA = join(dir, 'a.lock');
+    const lockB = join(dir, 'b.lock');
+    const result = await withLocks([lockA, lockB], () => 42);
+    expect(result).toBe(42);
+    // Both released — a second call over the same paths should succeed immediately.
+    expect(await withLocks([lockA, lockB], () => 43)).toBe(43);
+  });
+
+  it('two calls over disjoint lock sets run concurrently, not serialized', async () => {
     const order: string[] = [];
-    const first = withLock(lockPath, async () => {
+    const first = withLocks([join(dir, 'a.lock')], async () => {
       order.push('first-start');
       await new Promise((r) => setTimeout(r, 50));
       order.push('first-end');
     });
-    // Give `first` a moment to acquire the lock before `second` tries.
+    // Give `first` a moment to acquire its lock — if the two calls shared a lock, `second`
+    // would have to wait for `first-end` before starting; disjoint lock sets mean it doesn't.
     await new Promise((r) => setTimeout(r, 5));
-    const second = withLock(lockPath, () => { order.push('second-start'); });
+    const second = withLocks([join(dir, 'b.lock')], () => { order.push('second-start'); });
+
+    await Promise.all([first, second]);
+    expect(order).toEqual(['first-start', 'second-start', 'first-end']);
+  });
+
+  it('two calls sharing a lock path still serialize', async () => {
+    const shared = join(dir, 'shared.lock');
+    const order: string[] = [];
+    const first = withLocks([shared], async () => {
+      order.push('first-start');
+      await new Promise((r) => setTimeout(r, 50));
+      order.push('first-end');
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    const second = withLocks([shared], () => { order.push('second-start'); });
 
     await Promise.all([first, second]);
     expect(order).toEqual(['first-start', 'first-end', 'second-start']);
   });
 
-  it('releases the lock even if the function throws', async () => {
-    await expect(withLock(lockPath, () => { throw new Error('boom'); })).rejects.toThrow('boom');
-    const result = await withLock(lockPath, () => 'recovered');
-    expect(result).toBe('recovered');
+  it('releases every acquired lock even if the function throws', async () => {
+    const lockA = join(dir, 'a.lock');
+    const lockB = join(dir, 'b.lock');
+    await expect(withLocks([lockA, lockB], () => { throw new Error('boom'); })).rejects.toThrow('boom');
+    expect(await withLocks([lockA, lockB], () => 'recovered')).toBe('recovered');
+  });
+
+  it('deduplicates a repeated lock path instead of deadlocking on itself', async () => {
+    const lockA = join(dir, 'a.lock');
+    const result = await withLocks([lockA, lockA], () => 'ok');
+    expect(result).toBe('ok');
   });
 });
 
@@ -59,7 +90,7 @@ describe('withLockSync', () => {
 
   it('times out with a clear error if the lock is never released', () => {
     // Simulates another process holding the lock indefinitely - there's no way to release it
-    // from another thread mid-call the way the async withLock test does with a timer, since
+    // from another thread mid-call the way the async withLocks tests do with a timer, since
     // withLockSync blocks this thread synchronously. Pre-creating (and never removing) the lock
     // file is the synchronous equivalent: it proves the retry budget is real and bounded, not
     // an infinite/silent hang.

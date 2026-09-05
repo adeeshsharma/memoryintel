@@ -3,7 +3,7 @@ import { join, basename } from 'node:path';
 import { WRITABLE_FILES } from '../../core/pathSafety.js';
 import { computeFileHealth } from '../health.js';
 import { detectToolsWired } from '../registry.js';
-import { getCeilingLines, countLines } from '../../core/compressionConfig.js';
+import { getCeilingChars } from '../../core/compressionConfig.js';
 import { escapeHtml, pageShell, freshnessTier, formatAge } from './layout.js';
 
 function renderFileBrowser(memoryRoot: string): string {
@@ -25,10 +25,9 @@ function renderFileBrowser(memoryRoot: string): string {
       const lastUpdated = healthByFile[file]?.lastUpdated;
       const tier = freshnessTier(staleness ?? null);
       const stalenessLabel = lastUpdated ? formatAge(Date.now() - new Date(lastUpdated).getTime()) : 'never updated';
-      const lines = countLines(content);
-      const ceiling = getCeilingLines(memoryRoot, file);
-      const sizeClass = lines > ceiling ? 'stale' : 'muted';
-      const sizeLabel = `${lines}/${ceiling} lines`;
+      const ceiling = getCeilingChars(memoryRoot, file);
+      const sizeClass = content.length > ceiling ? 'stale' : 'muted';
+      const sizeLabel = `${content.length}/${ceiling} chars`;
       return `<details><summary>${escapeHtml(file)} <span class="muted stale-label ${tier}">(${stalenessLabel})</span> <span class="${sizeClass}">${escapeHtml(sizeLabel)}</span></summary><pre>${escapeHtml(content || '(empty)')}</pre></details>`;
     }).join('\n');
     return `<h3>${escapeHtml(domain)}</h3>\n${items}`;

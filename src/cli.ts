@@ -187,7 +187,10 @@ async function main(): Promise<void> {
       const result = await runUpdate(root, planText);
       // root printed first, same reasoning as load/status: a wrong-directory update should
       // never be silent.
-      process.stdout.write(`root: ${root}\nApplied: ${result.applied.join(', ') || '(none)'}\nSkipped: ${result.skipped.join(', ') || '(none)'}\n`);
+      const overCeilingLine = result.overCeiling.length > 0
+        ? `Over ceiling (consider compressing): ${result.overCeiling.join(', ')}\n`
+        : '';
+      process.stdout.write(`root: ${root}\nApplied: ${result.applied.join(', ') || '(none)'}\nSkipped: ${result.skipped.join(', ') || '(none)'}\n${overCeilingLine}`);
       process.exitCode = 0;
       return;
     }

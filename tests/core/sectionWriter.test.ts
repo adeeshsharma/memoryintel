@@ -83,4 +83,20 @@ describe('isNearDuplicate', () => {
   it('treats substantively different content as not duplicate', () => {
     expect(isNearDuplicate('the old status', 'a completely different update')).toBe(false);
   });
+
+  it('catches a reworded restatement of the same fact via token overlap, not just literal substring', () => {
+    const existing = 'Auth service issues JWTs and rotates refresh tokens';
+    const reworded = 'rotates refresh tokens and issues JWTs auth service';
+    expect(isNearDuplicate(existing, reworded)).toBe(true);
+  });
+
+  it('does not flag short additions as duplicate just because a couple words overlap', () => {
+    expect(isNearDuplicate('Uses Postgres 14 and Redis for caching', 'Added Redis')).toBe(false);
+  });
+
+  it('does not flag a genuinely new fact that happens to share the subject noun', () => {
+    const existing = 'Auth service issues JWTs and rotates refresh tokens every 15 minutes';
+    const unrelated = 'Auth service now also logs failed login attempts to a separate audit table';
+    expect(isNearDuplicate(existing, unrelated)).toBe(false);
+  });
 });

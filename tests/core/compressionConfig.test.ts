@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getCeilingLines, countLines, DEFAULT_CEILING_LINES } from '../../src/core/compressionConfig.js';
+import { getCeilingChars, countLines, DEFAULT_CEILING_CHARS } from '../../src/core/compressionConfig.js';
 
 let root: string;
 
@@ -21,31 +21,31 @@ describe('countLines', () => {
   });
 });
 
-describe('getCeilingLines', () => {
+describe('getCeilingChars', () => {
   it('returns the built-in default when memory-config.json does not exist', () => {
-    expect(getCeilingLines(root, 'technical/architecture.md')).toBe(DEFAULT_CEILING_LINES);
+    expect(getCeilingChars(root, 'technical/architecture.md')).toBe(DEFAULT_CEILING_CHARS);
   });
 
   it('returns the built-in default when memory-config.json has no compression key', () => {
     writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ version: '0.1.0' }));
-    expect(getCeilingLines(root, 'technical/architecture.md')).toBe(DEFAULT_CEILING_LINES);
+    expect(getCeilingChars(root, 'technical/architecture.md')).toBe(DEFAULT_CEILING_CHARS);
   });
 
-  it("returns memory-config.json's defaultCeilingLines when set", () => {
-    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingLines: 500 } }));
-    expect(getCeilingLines(root, 'technical/architecture.md')).toBe(500);
+  it("returns memory-config.json's defaultCeilingChars when set", () => {
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingChars: 20000 } }));
+    expect(getCeilingChars(root, 'technical/architecture.md')).toBe(20000);
   });
 
   it('prefers a domain override over the default', () => {
     writeFileSync(join(root, 'memory-config.json'), JSON.stringify({
-      compression: { defaultCeilingLines: 300, domainOverrides: { technical: 800 } }
+      compression: { defaultCeilingChars: 12000, domainOverrides: { technical: 30000 } }
     }));
-    expect(getCeilingLines(root, 'technical/architecture.md')).toBe(800);
-    expect(getCeilingLines(root, 'business/roadmap.md')).toBe(300);
+    expect(getCeilingChars(root, 'technical/architecture.md')).toBe(30000);
+    expect(getCeilingChars(root, 'business/roadmap.md')).toBe(12000);
   });
 
   it('falls back to the built-in default on corrupt JSON rather than throwing', () => {
     writeFileSync(join(root, 'memory-config.json'), '{ not json');
-    expect(getCeilingLines(root, 'technical/architecture.md')).toBe(DEFAULT_CEILING_LINES);
+    expect(getCeilingChars(root, 'technical/architecture.md')).toBe(DEFAULT_CEILING_CHARS);
   });
 });

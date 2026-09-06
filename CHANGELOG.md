@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.3.0...memoryintel-v1.3.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* reject a literal backslash-n in a TOON field instead of silently writing it ([#22](https://github.com/adeeshsharma/memoryintel/issues/22)) ([f5bb982](https://github.com/adeeshsharma/memoryintel/commit/f5bb982c3401f45155e445af5fa09015e528384c))
+
 ## [1.3.0](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.2.0...memoryintel-v1.3.0) (2026-09-06)
 
 

@@ -62,6 +62,15 @@ describe('upsertDetectedBlock', () => {
     expect(readFileSync(filePath, 'utf-8')).toBe(before);
   });
 
+  it('separates a freshly-inserted block from the heading above and the next heading below with exactly one blank line', () => {
+    writeFileSync(filePath, '## Stack\n\nExisting prose about the stack.\n\n## Conventions\n');
+    upsertDetectedBlock(filePath, 'Stack', ['- Next.js']);
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toBe(
+      `## Stack\n\n${DETECTED_START}\n- Next.js\n${DETECTED_END}\n\nExisting prose about the stack.\n\n## Conventions\n`
+    );
+  });
+
   it('never touches a different section in the same file', () => {
     writeFileSync(filePath, '## Stack\n\n## Conventions\nAlways use 2-space indentation.\n');
     upsertDetectedBlock(filePath, 'Stack', ['- Next.js']);

@@ -42,8 +42,18 @@ export function upsertDetectedBlock(absPath: string, heading: string, lines: str
     const after = sectionContent.slice(endIdx + DETECTED_END.length);
     newSectionContent = `${before}${newBlock}${after}`;
   } else {
+    // Fresh insertion (no existing block to slot into): `.trim()` here would swallow the blank
+    // line this project's own files (and getSectionContent's own single-blank-line stripping
+    // convention) always separate a heading, and every section, by - caught via dogfooding this
+    // feature on this very repo, where a fresh Stack block landed flush against `## Conventions`
+    // with zero blank line between them. The leading/trailing `\n` below combine with
+    // applySectionUpdate's own join('\n') separators (one on each side of this section's content)
+    // to reconstruct exactly one blank line after the heading and exactly one before whatever
+    // comes next (another heading, or end of file) - matching the surrounding blank-line rhythm
+    // instead of fighting it.
     const rest = sectionContent.trim();
-    newSectionContent = rest.length > 0 ? `${newBlock}\n\n${rest}` : newBlock;
+    const body = rest.length > 0 ? `${newBlock}\n\n${rest}` : newBlock;
+    newSectionContent = `\n${body}\n`;
   }
 
   if (newSectionContent === sectionContent) return 'unchanged';

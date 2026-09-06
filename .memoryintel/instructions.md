@@ -110,10 +110,12 @@ committed — not because updating was hard, but because nothing in the session 
 before the worktree's job was considered done.
 
 ## Compaction
-A file marked `status: over` in `load`'s manifest has grown past its configured line ceiling.
-This is a signal, not a command — compact it only when it's a sensible moment to (the same
-judgment you already apply to whether to update at all), by adding a row to your update-plan with
-one extra field, `kind: compress`, and `action: replace` against the section that's grown large.
+A file marked `status: over` in `load`'s manifest has grown past its configured char ceiling —
+`update` also flags this itself, in the same call that pushes a file over, rather than waiting for
+the next `load`. This is a signal, not a command — compact it only when it's a sensible moment to
+(the same judgment you already apply to whether to update at all), by adding a row to your
+update-plan with one extra field, `kind: compress`, and `action: replace` against the section
+that's grown large.
 `update` will only apply that row if the target file is currently git-clean — if it isn't, the row
 is rejected and the file is left untouched; commit the current state first, then retry. Aim to
 compact to comfortably under the ceiling, not exactly at it.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dispatch } from '../src/cli.js';
@@ -91,6 +91,41 @@ describe('cli dispatch', () => {
       process.chdir(originalCwd);
       rmSync(projectDir, { recursive: true, force: true });
       rmSync(unrelatedDir, { recursive: true, force: true });
+    }
+  });
+
+  it('documents sync in the usage text', () => {
+    const usage = dispatch([]).stdout;
+    expect(usage).toContain('sync');
+  });
+
+  it('sync errors cleanly when no .memoryintel/ exists', () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), 'mi-cli-sync-empty-'));
+    const originalCwd = process.cwd();
+    process.chdir(emptyDir);
+    try {
+      const result = dispatch(['sync']);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('No .memoryintel/ found');
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(emptyDir, { recursive: true, force: true });
+    }
+  });
+
+  it('sync reports what it wrote', () => {
+    const projectDir = mkdtempSync(join(tmpdir(), 'mi-cli-sync-'));
+    const originalCwd = process.cwd();
+    try {
+      runInit(projectDir);
+      writeFileSync(join(projectDir, 'package.json'), JSON.stringify({ dependencies: { next: '^14.0.0' } }));
+      process.chdir(projectDir);
+      const result = dispatch(['sync']);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('technical/techContext.md');
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(projectDir, { recursive: true, force: true });
     }
   });
 

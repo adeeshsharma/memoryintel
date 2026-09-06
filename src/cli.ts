@@ -13,6 +13,7 @@ import { runCheckStop } from './adapters/claudeCode.js';
 import { runDashboardEnable, runDashboardDisable } from './commands/dashboardToggle.js';
 import { runDaemonStart } from './commands/daemonStart.js';
 import { runDoctor } from './commands/doctor.js';
+import { syncDetectedFacts } from './core/factSync.js';
 
 // Every command below that resolves .memoryintel/ by walking up from a starting directory
 // previously always used process.cwd() with no override - meaning a long, multi-project
@@ -53,6 +54,9 @@ Commands:
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)
   status                   Print a human-readable summary of current memory state
   check-stop               Stop-hook check: emit a JSON allow/block decision
+  sync                      Re-scan for stack/integration/deployment facts and write any new
+                            findings - runs automatically via load/check-stop; this is the
+                            manual/debugging entry point
   dashboard <enable|disable>  Turn the shared local dashboard on or off
   doctor [--force]         Refresh memoryintel's own generated files (instructions.md, pointer
                            blocks) to the current template wherever it's provably safe;
@@ -96,6 +100,15 @@ export function dispatch(argv: string[]): DispatchResult {
       if (!root) return { exitCode: 0, stdout: '', stderr: '' };
       const result = runCheckStop(root);
       return { exitCode: 0, stdout: JSON.stringify(result) + '\n', stderr: '' };
+    }
+    case 'sync': {
+      const root = findMemoryIntelRoot(resolveStartDir(argv));
+      if (!root) return { exitCode: 1, stdout: '', stderr: 'No .memoryintel/ found.\n' };
+      const result = syncDetectedFacts(root);
+      const stdout = result.written.length > 0
+        ? `root: ${root}\nUpdated: ${result.written.join(', ')}\n`
+        : `root: ${root}\nNo changes - detected facts already up to date.\n`;
+      return { exitCode: 0, stdout, stderr: '' };
     }
     case 'doctor': {
       const root = findMemoryIntelRoot(resolveStartDir(argv));

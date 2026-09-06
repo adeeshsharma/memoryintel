@@ -289,7 +289,7 @@
     <h2>One command, then nothing to remember</h2>
     <p class="lede">Memory Intel keeps an AI coding agent's understanding of a project alive across sessions — a running "mental model," decisions, architecture notes — without asking anyone to maintain it by hand.</p>
     <p>The whole system rests on one deliberate rule: a person runs <code>memoryintel init</code> once, in chat, when they decide a project deserves persistent memory. Everything after that — loading context at the start of a session, deciding whether anything worth remembering happened, writing it down — is the agent's job, triggered automatically, never typed by a person again.</p>
-    <p>Three pieces make that possible, and each shows up again in every diagram below: the <strong>CLI</strong> (<code>memoryintel</code>, run via <code>npx</code>, no install required) does all the real file work; the <strong>skill</strong> (<code>skills/memory-intel/SKILL.md</code>) tells an agent when to reach for the CLI and in what words; the <strong>plugin hooks</strong> (<code>hooks/hooks.json</code>) fire the CLI automatically at the start and end of every turn, in every project, without ever touching that project's own configuration.</p>
+    <p>Three pieces make that possible, and each shows up again in every diagram below: the <strong>CLI</strong> (<code>memoryintel</code>, run via <code>npx</code>, no install required) does all the real file work; the <strong>skill</strong> (<code>skills/memoryintel/SKILL.md</code>) tells an agent when to reach for the CLI and in what words; the <strong>plugin hooks</strong> (<code>hooks/hooks.json</code>) fire the CLI automatically at the start and end of every turn, in every project, without ever touching that project's own configuration.</p>
   </div>
 </section>
 
@@ -489,10 +489,8 @@
 │   ├── productContext.md · roadmap.md · stakeholders.md · marketContext.md
 ├── <span class="dir">research/</span>
 │   ├── findings.md · references.md · hypotheses.md
-├── <span class="dir">intelligence/</span>            <span class="note">← empty stubs, reserved for the future knowledge-graph phase</span>
-│   ├── entities.json · relationships.json · metadata.json
 ├── instructions.md             <span class="note">← the per-project rulebook an agent reads first</span>
-├── memory-config.json          <span class="note">← optional compression.defaultCeilingLines / domainOverrides</span>
+├── memory-config.json          <span class="note">← optional compression.defaultCeilingChars / domainOverrides</span>
 ├── memory-index.json           <span class="note">← last-updated timestamp + summary, per file</span>
 ├── memory-events.jsonl         <span class="note">← append-only audit log, one line per change</span>
 └── .session-marker.json        <span class="note">← the Stop-hook nudge's own bookkeeping</span></div>
@@ -561,7 +559,7 @@
 
           <text x="20" y="146" class="step-n">3</text>
           <line x1="470" y1="150" x2="698" y2="150" class="msg" marker-end="url(#arrow2)"></line>
-          <text x="584" y="143" class="msg-lbl" text-anchor="middle">scaffold context/technical/business/research/intelligence</text>
+          <text x="584" y="143" class="msg-lbl" text-anchor="middle">scaffold context/technical/business/research</text>
 
           <text x="20" y="186" class="step-n">4</text>
           <line x1="470" y1="190" x2="698" y2="190" class="msg" marker-end="url(#arrow2)"></line>
@@ -585,7 +583,7 @@
   <div class="wide">
     <p class="eyebrow">Command sequence — every session</p>
     <h2>What runs without anyone asking</h2>
-    <p class="lede">Once the memory-intel plugin is installed, this whole sequence is automatic. <code>SessionStart</code> fires once; <code>Stop</code> fires after <em>every</em> turn, which is why the nudge only fires once per distinct unresolved change. Step 2's manifest also carries each file's line count against a configurable ceiling — see <a href="#self-compression">Self-compression</a> below for what an agent does when one crosses it.</p>
+    <p class="lede">Once the memory-intel plugin is installed, this whole sequence is automatic. <code>SessionStart</code> fires once; <code>Stop</code> fires after <em>every</em> turn, which is why the nudge only fires once per distinct unresolved change. Step 2's manifest also carries each file's char count against a configurable ceiling — see <a href="#self-compression">Self-compression</a> below for what an agent does when one crosses it. <code>SessionStart</code> never passes <code>--domain</code>, so step 2 auto-carries forward whichever domain the most recent <code>update()</code> touched — an explicit <code>--domain</code> still overrides.</p>
 
     <div class="diagram-frame">
       <figure>
@@ -625,7 +623,7 @@
 
           <text x="20" y="120" class="step-n">2</text>
           <line x1="270" y1="124" x2="678" y2="124" class="msg" marker-end="url(#arrow3)"></line>
-          <text x="474" y="117" class="msg-lbl" text-anchor="middle">read currentMentalModel.md, activeContext.md, [domain files]</text>
+          <text x="474" y="117" class="msg-lbl" text-anchor="middle">read currentMentalModel.md, activeContext.md, + last-touched domain</text>
 
           <text x="20" y="150" class="step-n">3</text>
           <line x1="270" y1="154" x2="72" y2="154" class="msg-accent" marker-end="url(#arrow3)"></line>
@@ -658,7 +656,7 @@
 
           <text x="20" y="468" class="step-n">9</text>
           <line x1="270" y1="472" x2="678" y2="472" class="msg" marker-end="url(#arrow3)"></line>
-          <text x="474" y="465" class="msg-lbl" text-anchor="middle">write section(s), log event, resolve the check-stop marker</text>
+          <text x="474" y="465" class="msg-lbl" text-anchor="middle">write section(s) under a per-file lock, log event, resolve marker</text>
 
           <text x="20" y="498" class="step-n">10</text>
           <line x1="470" y1="470" x2="470" y2="490" class="msg" opacity="0"></line>
@@ -758,7 +756,7 @@
 
     <div class="diagram-frame">
       <figure>
-        <svg viewBox="0 0 960 400" role="img" aria-label="Flow diagram: load() flags a file as over its line ceiling in its manifest, the agent drafts an update-plan row with kind compress, update() checks git status scoped to that one file, and either writes the compacted section and logs it as type compression when the file is clean, or rejects the row and leaves the file untouched, logging it as compression-rejected, when the file is dirty or its git status can't be determined.">
+        <svg viewBox="0 0 960 400" role="img" aria-label="Flow diagram: load() flags a file as over its char ceiling in its manifest (or update() flags it immediately, in the same call that pushed it over), the agent drafts an update-plan row with kind compress, update() checks git status scoped to that one file, and either writes the compacted section and logs it as type compression when the file is clean, or rejects the row and leaves the file untouched, logging it as compression-rejected, when the file is dirty or its git status can't be determined.">
           <defs>
             <marker id="arrow4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
@@ -782,7 +780,7 @@
           <text x="16" y="70" class="step-n">1</text>
           <rect x="30" y="54" width="230" height="70" rx="8" class="box"></rect>
           <text x="145" y="82" class="lbl-b" text-anchor="middle">load() flags the file</text>
-          <text x="145" y="100" class="mono" text-anchor="middle" opacity="0.8">status: over (lines &gt; ceiling)</text>
+          <text x="145" y="100" class="mono" text-anchor="middle" opacity="0.8">status: over (chars &gt; ceiling)</text>
 
           <line x1="260" y1="89" x2="338" y2="89" class="edge" marker-end="url(#arrow4)"></line>
 
@@ -818,6 +816,10 @@
         </svg>
       </figure>
       <figcaption>Step 3 is the whole safety mechanism: git already holds the pre-compression version once the file is clean, so compaction can only ever discard what's already durably recoverable — never something that exists nowhere else.</figcaption>
+    </div>
+
+    <div class="callout">
+      <strong>Step 1 isn't only <code>load()</code> anymore.</strong> <code>update()</code> now checks the same ceiling immediately after every write it applies, in the same call — a file crossing it shows up as <code>overCeiling</code> in that call's result and an <code>Over ceiling: ...</code> line in the CLI's own stdout, not just as <code>status: over</code> the next time someone happens to run <code>load()</code>.
     </div>
 
     <div class="callout">

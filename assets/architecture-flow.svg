@@ -1,0 +1,105 @@
+<svg viewBox="0 0 1180 520" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif">
+<style>
+  :root { color-scheme: light dark; }
+  .surface { fill: #fcfcfb; }
+  .ink { fill: #0b0b0b; }
+  .ink2 { fill: #52514e; }
+  .node-a { fill: #2a78d6; }
+  .node-c { fill: #1baf7a; }
+  .storage-border { stroke: #4a3aa7; fill: none; }
+  .subfolder { fill: color-mix(in srgb, #4a3aa7 10%, transparent); stroke: #4a3aa7; stroke-opacity: 0.35; }
+  .accent-read { stroke: #4a3aa7; }
+  .accent-write { stroke: #eb6834; }
+  .loop { stroke: #898781; }
+  @media (prefers-color-scheme: dark) {
+    .surface { fill: #1a1a19; }
+    .ink { fill: #ffffff; }
+    .ink2 { fill: #c3c2b7; }
+    .node-a { fill: #3987e5; }
+    .node-c { fill: #199e70; }
+    .storage-border { stroke: #9085e9; }
+    .subfolder { fill: color-mix(in srgb, #9085e9 14%, transparent); stroke: #9085e9; stroke-opacity: 0.4; }
+    .accent-read { stroke: #9085e9; }
+    .accent-write { stroke: #d95926; }
+    .loop { stroke: #6b6a63; }
+  }
+  .label { font-size: 16px; font-weight: 600; }
+  .sublabel { font-size: 11px; }
+  .mono { font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
+  .cmd { font-family: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace; font-size: 14px; font-weight: 700; }
+  .detail { font-size: 11.5px; }
+  .hook-tag { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+  path.edge { fill: none; stroke-width: 2.5; }
+  path.loop-edge { fill: none; stroke-width: 2; stroke-dasharray: 4 5; }
+  circle.pulse { r: 5.5; }
+  .pulse-read { fill: #4a3aa7; }
+  .pulse-write { fill: #eb6834; }
+  @media (prefers-color-scheme: dark) {
+    .pulse-read { fill: #9085e9; }
+    .pulse-write { fill: #d95926; }
+  }
+  @keyframes travel { from { offset-distance: 0%; opacity: 0; } 8% { opacity: 1; } 92% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+  #pulse-load { offset-path: path("M 158,345 C 260,275 350,235 420,213"); animation: travel 2s ease-in-out infinite; animation-delay: 0s; }
+  #pulse-context { offset-path: path("M 745,213 C 850,250 950,285 1022,345"); animation: travel 2s ease-in-out infinite; animation-delay: 2s; }
+  #pulse-update { offset-path: path("M 1015,418 C 880,495 340,495 430,236"); animation: travel 2.4s ease-in-out infinite; animation-delay: 4s; }
+  @media (prefers-reduced-motion: reduce) {
+    #pulse-load, #pulse-context, #pulse-update { animation: none; opacity: 0; }
+  }
+</style>
+
+<rect class="surface" width="1180" height="520" rx="10"/>
+
+<!-- A: new session -->
+<circle class="node-a" cx="120" cy="380" r="50"/>
+<text class="label" x="120" y="376" text-anchor="middle" fill="white">New</text>
+<text class="label" x="120" y="396" text-anchor="middle" fill="white">session</text>
+
+<!-- storage: .memoryintel/ with real subfolders -->
+<rect class="storage-border" x="420" y="40" width="340" height="200" rx="14" stroke-width="2"/>
+<text class="label ink" x="590" y="65" text-anchor="middle">.memoryintel/</text>
+
+<rect class="subfolder" x="435" y="78" width="150" height="60" rx="8"/>
+<text class="mono ink" x="510" y="113" text-anchor="middle">context/</text>
+
+<rect class="subfolder" x="595" y="78" width="150" height="60" rx="8"/>
+<text class="mono ink" x="670" y="113" text-anchor="middle">technical/</text>
+
+<rect class="subfolder" x="435" y="148" width="150" height="60" rx="8"/>
+<text class="mono ink" x="510" y="183" text-anchor="middle">business/</text>
+
+<rect class="subfolder" x="595" y="148" width="150" height="60" rx="8"/>
+<text class="mono ink" x="670" y="183" text-anchor="middle">research/</text>
+
+<!-- C: agent works -->
+<circle class="node-c" cx="1060" cy="380" r="50"/>
+<text class="label" x="1060" y="376" text-anchor="middle" fill="white">Agent</text>
+<text class="label" x="1060" y="396" text-anchor="middle" fill="white">works</text>
+<text class="sublabel ink2" x="1060" y="450" text-anchor="middle">reads/writes code,</text>
+<text class="sublabel ink2" x="1060" y="464" text-anchor="middle">drafts an update-plan</text>
+
+<!-- edges -->
+<path class="edge accent-read" d="M 158,345 C 260,275 350,235 420,213"/>
+<path class="edge accent-read" d="M 745,213 C 850,250 950,285 1022,345"/>
+<path class="edge accent-write" d="M 1015,418 C 880,495 340,495 430,236"/>
+<path class="loop-edge loop" d="M 425,50 C 320,10 210,42 150,330"/>
+
+<text class="hook-tag ink2" x="235" y="300">SessionStart hook</text>
+<text class="cmd ink" x="235" y="319">$ memoryintel load</text>
+<text class="detail ink2" x="235" y="336">always: currentMentalModel.md</text>
+<text class="detail ink2" x="235" y="349">+ activeContext.md</text>
+<text class="detail ink2" x="235" y="365">+ domain auto-carried from</text>
+<text class="detail ink2" x="235" y="378">the last update()</text>
+
+<text class="detail ink2" x="860" y="290" text-anchor="middle">context injected</text>
+<text class="detail ink2" x="860" y="304" text-anchor="middle">into the session</text>
+
+<text class="hook-tag ink2" x="720" y="454" text-anchor="middle">Stop hook</text>
+<text class="cmd ink" x="720" y="474" text-anchor="middle">$ memoryintel update</text>
+<text class="detail ink2" x="720" y="491" text-anchor="middle">validates plan → atomic write → per-file lock → logs event</text>
+
+<text class="detail ink2" x="250" y="30" text-anchor="middle">next session — sees everything just written</text>
+
+<circle id="pulse-load" class="pulse pulse-read"/>
+<circle id="pulse-context" class="pulse pulse-read"/>
+<circle id="pulse-update" class="pulse pulse-write"/>
+</svg>

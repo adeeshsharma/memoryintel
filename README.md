@@ -13,6 +13,13 @@ This repository is itself running Memory Intel on itself — see `.memoryintel/`
 current state, decisions, and open todo items. Any agent with the skill below active will read it
 automatically.
 
+![Memory Intel's dashboard: a registry of projects and one project's mental model](assets/dashboard-demo.gif)
+
+*The local dashboard (`memoryintel dashboard enable`) — a read-only view of every initialized
+project on the machine. Demo data shown above; captured against the real running server, not
+mocked up. [Watch the full tour (mp4)](assets/dashboard-demo.mp4) for automation status, session
+activity, and the event timeline too.*
+
 ## Quick Start
 
 ```bash
@@ -88,7 +95,9 @@ depend on the agent noticing anything.
 ### If you don't want to touch Claude Code's plugin system at all
 
 The CLI works standalone, with no plugin/skill/hook involved — useful for scripting, for other
-tools, or just to try it out:
+tools, or just to try it out. This is exactly what a `SessionStart`/`Stop` hook runs for you
+automatically when a plugin is active — shown here run by hand so you can see what actually
+happens under the hood:
 
 ```bash
 memoryintel init      # once per project — scaffolds .memoryintel/, installs pointer files
@@ -96,6 +105,13 @@ memoryintel init      # once per project — scaffolds .memoryintel/, installs p
 memoryintel load       # print resolved context to stdout
 memoryintel update plan.toon   # apply an update-plan
 ```
+
+![Terminal walkthrough: memoryintel init, then load printing an empty scaffold](assets/cli-walkthrough.gif)
+
+*`init` → `load` → draft a real update-plan → `update` → `load` again, now auto-carrying the
+domain the update just touched. Every command above actually ran; nothing is a typed-out
+transcript. [Watch the full walkthrough (mp4)](assets/cli-walkthrough.mp4) for the update-plan and
+the auto-carry-domain payoff.*
 
 `memoryintel init` never touches a project's own `.claude/settings.json` — Claude Code automation
 comes entirely from the plugin's own `hooks/hooks.json` in this repo, active once the plugin
@@ -113,12 +129,68 @@ assumed default.
 
 ## How it works
 
+![Architecture diagram: a session starts and calls load(), which pulls context from .memoryintel/ (auto-carrying whichever domain the last update touched) into the agent; the agent works; update() writes back to .memoryintel/ as an atomic, per-file-locked write; the next session repeats the cycle](assets/architecture-flow.svg)
+
+`.memoryintel/` is a structured, git-committed set of markdown/JSON files — the single source of
+truth both directions in the diagram above read from and write to. At session start, `load()`
+prints the always-loaded files plus whichever technical/business/research domain the most recent
+`update()` actually touched (an explicit `--domain` still overrides). The agent works, then drafts
+an update-plan and calls `update()`, which validates it, writes atomically under a per-file lock,
+and logs the change — never a changelog, always a maintained understanding of the project as it
+currently is.
+
 Full design docs live in `docs/superpowers/specs/`; a diagram-heavy architecture reference lives
-in `docs/architecture/memory-intel-architecture.html`. In short: `.memoryintel/` is a structured,
-git-committed set of markdown/JSON files an agent reads at session start and selectively updates
-when something meaningful changes — never a changelog, always a maintained understanding of the
-project as it currently is. See `.memoryintel/context/decisions.md` in this very repository for
-the specific design decisions behind that, with rationale.
+in `docs/architecture/memory-intel-architecture.html`. See `.memoryintel/context/decisions.md` in
+this very repository for the specific design decisions behind the mechanism above, with rationale.
+
+### What `memoryintel init` actually creates
+
+Exactly this, and nothing else — every file below is real output from a fresh `memoryintel init`,
+not a hand-typed example:
+
+```text
+.memoryintel/
+├── instructions.md              # what an agent reads every session — the mechanism, in full
+├── memory-config.json           # compression ceiling overrides, generated-file hashes (for `doctor`)
+├── memory-index.json            # lastUpdated + one-line summary per file, keyed by path
+├── memory-events.jsonl          # append-only log: every load/update/compression, ever
+│
+├── context/                     # always loaded in full — no --domain needed
+│   ├── currentMentalModel.md    # whole-file replace only; the one narrative summary, not a log
+│   ├── activeContext.md         # what session-to-session work is focused on right now
+│   ├── projectBrief.md          # what the project is, for someone who's never seen it
+│   ├── objectives.md            # goals the project is actually working toward
+│   ├── decisions.md             # append-only decision log, with rationale
+│   ├── progress.md              # what's done, what's in flight
+│   └── learnings.md             # things worth not re-learning the hard way
+│
+├── technical/                   # a --domain: architecture, stack, patterns
+│   ├── architecture.md
+│   ├── techContext.md
+│   ├── patterns.md
+│   ├── integrations.md
+│   └── infrastructure.md
+│
+├── business/                    # a --domain: product, roadmap, stakeholders
+│   ├── productContext.md
+│   ├── roadmap.md
+│   ├── stakeholders.md
+│   └── marketContext.md
+│
+└── research/                    # a --domain: findings, open questions
+    ├── findings.md
+    ├── references.md
+    └── hypotheses.md
+
+AGENTS.md                        # pointer file (or .cursor/rules/memoryintel.mdc, GEMINI.md) —
+                                  # tells tools with no native hook where instructions.md lives
+```
+
+`context/` loads on every session automatically; `technical/`, `business/`, and `research/` are
+domains — `load()` pulls in whichever one the most recent `update()` touched, or you can ask for
+one explicitly (`memoryintel load --domain technical`). Every file starts as an empty, headed
+scaffold; there's no separate "add a new memory type" step; you just write to any of the 19 files
+above via an update-plan, same as any other.
 
 ## Existing projects (not greenfield)
 

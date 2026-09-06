@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.3...memoryintel-v1.1.4) (2026-09-06)
+
+
+### Bug Fixes
+
+* check-stop must return {} to allow, not { decision: 'allow' } ([#16](https://github.com/adeeshsharma/memoryintel/issues/16)) ([9a90409](https://github.com/adeeshsharma/memoryintel/commit/9a904090a8a3e6d775df0afd5f78ce8c84553122))
+
 ## [1.1.3](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.2...memoryintel-v1.1.3) (2026-09-05)
 
 

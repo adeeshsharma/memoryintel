@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.4...memoryintel-v1.2.0) (2026-09-06)
+
+
+### Features
+
+* automatic stack/integration/deployment fact detection ([#18](https://github.com/adeeshsharma/memoryintel/issues/18)) ([7b2ca13](https://github.com/adeeshsharma/memoryintel/commit/7b2ca13936ae0e081d13b5cb85477b9edbb3d2a8))
+
 ## [1.1.4](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.3...memoryintel-v1.1.4) (2026-09-06)
 
 

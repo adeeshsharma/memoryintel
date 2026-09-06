@@ -61,16 +61,19 @@ function isWorkingTreeDirty(projectRoot: string): boolean {
   });
 }
 
-export function runCheckStop(memoryRoot: string): { decision: 'block' | 'allow'; reason?: string } {
+// Claude Code's Stop hook JSON schema only recognizes decision: "block" - there is no "allow"
+// value, so the non-blocking cases must return {} (decision omitted), not { decision: 'allow' },
+// or Claude Code rejects the hook output outright ("Hook JSON output validation failed").
+export function runCheckStop(memoryRoot: string): { decision?: 'block'; reason?: string } {
   const projectRoot = dirname(memoryRoot);
   const markerPath = join(memoryRoot, '.session-marker.json');
   const marker = readMarker(markerPath);
 
   const signature = computeDiffSignature(projectRoot);
-  if (signature === null) return { decision: 'allow' };
+  if (signature === null) return {};
 
   if (signature === marker.lastFlaggedDiffSignature) {
-    return { decision: 'allow' };
+    return {};
   }
 
   // A brand-new marker (nothing has ever been flagged or resolved in this project) with a
@@ -80,7 +83,7 @@ export function runCheckStop(memoryRoot: string): { decision: 'block' | 'allow';
   // project's very first Stop event.
   if (marker.lastFlaggedDiffSignature === null && !isWorkingTreeDirty(projectRoot)) {
     writeMarker(markerPath, { lastFlaggedDiffSignature: signature });
-    return { decision: 'allow' };
+    return {};
   }
 
   writeMarker(markerPath, { lastFlaggedDiffSignature: signature });

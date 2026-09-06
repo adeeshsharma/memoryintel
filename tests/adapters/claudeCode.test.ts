@@ -30,13 +30,13 @@ function commitAll(root: string, message: string): void {
 
 describe('runCheckStop', () => {
   it('allows the stop when the project is not a git repository (fail open)', () => {
-    expect(runCheckStop(memoryRoot)).toEqual({ decision: 'allow' });
+    expect(runCheckStop(memoryRoot)).toEqual({});
   });
 
   it('allows the stop when the git working tree is clean', () => {
     initGitRepo(projectRoot);
     commitAll(projectRoot, 'initial');
-    expect(runCheckStop(memoryRoot)).toEqual({ decision: 'allow' });
+    expect(runCheckStop(memoryRoot)).toEqual({});
   });
 
   it('blocks once when the working tree has uncommitted changes', () => {
@@ -63,7 +63,7 @@ describe('runCheckStop', () => {
 
     runCheckStop(memoryRoot);
     const second = runCheckStop(memoryRoot);
-    expect(second).toEqual({ decision: 'allow' });
+    expect(second).toEqual({});
   });
 
   it('blocks again when the diff changes further after already being flagged', () => {
@@ -121,14 +121,14 @@ describe('resolveCheckStopMarker', () => {
 
     resolveCheckStopMarker(memoryRoot);
     const result = runCheckStop(memoryRoot);
-    expect(result).toEqual({ decision: 'allow' });
+    expect(result).toEqual({});
   });
 
   it('still allows a genuinely clean tree afterward', () => {
     initGitRepo(projectRoot);
     commitAll(projectRoot, 'initial');
     resolveCheckStopMarker(memoryRoot);
-    expect(runCheckStop(memoryRoot)).toEqual({ decision: 'allow' });
+    expect(runCheckStop(memoryRoot)).toEqual({});
   });
 
   it('blocks again if the diff grows further after resolving', () => {

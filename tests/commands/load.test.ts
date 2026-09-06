@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runLoad } from '../../src/commands/load.js';
 import { runUpdate } from '../../src/commands/update.js';
+import { runInit } from '../../src/commands/init.js';
 import { encodeToonTable } from '../../src/core/toon.js';
 import { readRegistry } from '../../src/daemon/registry.js';
 
@@ -229,5 +230,24 @@ describe('runLoad daemon/registry side effects', () => {
     runLoad(emptyDir);
     expect(readRegistry()[emptyDir]).toBeUndefined();
     rmSync(emptyDir, { recursive: true, force: true });
+  });
+
+  it('auto-detects and includes newly-detected stack facts in the same load call', () => {
+    runInit(base); // fills in technical/techContext.md etc. that this file's own beforeEach doesn't create
+    writeFileSync(join(base, 'package.json'), JSON.stringify({ dependencies: { next: '^14.0.0' } }));
+
+    const output = runLoad(base, 'technical');
+
+    expect(output).toContain('Next.js');
+  });
+
+  it('never breaks load if fact detection throws for any reason', () => {
+    runInit(base);
+    // A package.json that exists but is not valid JSON - detectStack's readJsonSafe already
+    // returns null for this (verified in repoScan.ts), so this exercises the "detection found
+    // nothing usable" path end-to-end through load rather than load's own error handling.
+    writeFileSync(join(base, 'package.json'), 'not valid json');
+
+    expect(() => runLoad(base, 'technical')).not.toThrow();
   });
 });

@@ -1,5 +1,9 @@
 ## External Services
 
+<!-- memoryintel:detected:start -->
+_No known integrations detected._
+<!-- memoryintel:detected:end -->
+
 None. No network calls anywhere in the CLI — everything is local filesystem + local git.
 
 ## Internal Dependencies

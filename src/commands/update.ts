@@ -118,7 +118,8 @@ export async function runUpdate(
           timestamp: new Date().toISOString(),
           type: w.eventType,
           summary: w.reason,
-          affectedFiles: [w.relFile]
+          affectedFiles: [w.relFile],
+          source: 'agent'
         });
         skipped.push(w.relFile);
         continue;
@@ -129,7 +130,8 @@ export async function runUpdate(
         timestamp: new Date().toISOString(),
         type: w.eventType,
         summary: w.reason,
-        affectedFiles: [w.relFile]
+        affectedFiles: [w.relFile],
+        source: 'agent'
       });
       applied.push(w.relFile);
 
@@ -145,7 +147,8 @@ export async function runUpdate(
           timestamp: new Date().toISOString(),
           type: 'over-ceiling',
           summary: reason,
-          affectedFiles: [w.relFile]
+          affectedFiles: [w.relFile],
+          source: 'agent'
         });
         overCeiling.push(w.relFile);
       }

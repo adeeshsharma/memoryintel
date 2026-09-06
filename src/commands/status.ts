@@ -26,7 +26,8 @@ export function runStatus(root: string): string {
     const eventLines = readFileSync(eventsPath, 'utf-8').trim().split('\n').filter(Boolean);
     for (const line of eventLines.slice(-5)) {
       const event = JSON.parse(line);
-      lines.push(`[${event.timestamp}] ${event.type}: ${event.summary}`);
+      const sourceTag = event.source ? ` (${event.source})` : '';
+      lines.push(`[${event.timestamp}] ${event.type}${sourceTag}: ${event.summary}`);
     }
   }
 

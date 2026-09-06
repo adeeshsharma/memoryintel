@@ -1,6 +1,13 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { runGitStatusPorcelain, porcelainPath, runGitRevParseHead } from '../core/gitPorcelain.js';
+import { syncDetectedFacts } from '../core/factSync.js';
+
+// Same manifest filenames detectStack() (core/repoScan.ts) already recognizes - kept as a local
+// copy rather than importing repoScan's own internal list, since this is a small, stable set and
+// a shared-constant module for five string literals would be more machinery than the duplication
+// it avoids.
+const MANIFEST_FILES = new Set(['package.json', 'requirements.txt', 'pyproject.toml', 'go.mod', 'Cargo.toml']);
 
 interface SessionMarker {
   lastFlaggedDiffSignature: string | null;
@@ -87,10 +94,24 @@ export function runCheckStop(memoryRoot: string): { decision?: 'block'; reason?:
   }
 
   writeMarker(markerPath, { lastFlaggedDiffSignature: signature });
-  return {
-    decision: 'block',
-    reason: "Working tree has changes memory hasn't accounted for. Classify them, write a TOON update-plan, and run `memoryintel update <plan-file>` (see .memoryintel/instructions.md) before finishing - running `memoryintel update` bare, with no plan file, fails. Or finish again to proceed without updating this time."
-  };
+
+  let reason =
+    "Working tree has changes memory hasn't accounted for. Classify them, write a TOON update-plan, and run `memoryintel update <plan-file>` (see .memoryintel/instructions.md) before finishing - running `memoryintel update` bare, with no plan file, fails. Or finish again to proceed without updating this time.";
+
+  // Mechanism 2 (see docs/superpowers/specs/2026-09-06-automatic-fact-detection-design.md): when
+  // the diff touches a manifest file, name specifically what auto-detection just found, so the
+  // agent's own follow-up judgment gets a concrete lead instead of only "something changed, go
+  // figure out what." This never changes the block/allow decision itself - only the reason text.
+  const statusLines = runGitStatusPorcelain(projectRoot);
+  const touchesManifest = statusLines !== null && statusLines.some((l) => MANIFEST_FILES.has(porcelainPath(l)));
+  if (touchesManifest) {
+    const syncResult = syncDetectedFacts(memoryRoot);
+    if (syncResult.written.length > 0) {
+      reason += ` Also: a manifest file changed — auto-detected facts were just written to ${syncResult.written.join(', ')}. Worth a note elsewhere (e.g. why it was added) if that's not just incidental.`;
+    }
+  }
+
+  return { decision: 'block', reason };
 }
 
 // Called after a successful `update`. Does NOT simply clear the marker to null — `update` only

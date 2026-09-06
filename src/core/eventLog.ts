@@ -16,6 +16,10 @@ export interface MemoryEvent {
   domainSource?: 'explicit' | 'auto' | null;
   totalChars?: number;
   totalLines?: number;
+  // Distinguishes an event memoryintel itself wrote from repo evidence (factSync.ts) from one an
+  // agent wrote from its own judgment (update.ts) - lets `status`/the dashboard always show which
+  // is which, especially when the two might disagree about the same fact.
+  source?: 'agent' | 'auto-detect';
 }
 
 export function appendEvent(eventsPath: string, event: MemoryEvent): void {

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runStatus } from '../../src/commands/status.js';
+import { appendEvent } from '../../src/core/eventLog.js';
 
 let root: string;
 
@@ -36,5 +37,16 @@ describe('runStatus', () => {
 
   it('includes the resolved root, so a wrong-directory status is visible rather than silent', () => {
     expect(runStatus(root)).toContain(root);
+  });
+
+  it('shows the event source when present', () => {
+    appendEvent(join(root, 'memory-events.jsonl'), {
+      timestamp: '2026-08-20T10:05:00Z',
+      type: 'fact-sync',
+      summary: 'Auto-detected facts written to technical/techContext.md',
+      affectedFiles: ['technical/techContext.md'],
+      source: 'auto-detect'
+    });
+    expect(runStatus(root)).toContain('auto-detect');
   });
 });

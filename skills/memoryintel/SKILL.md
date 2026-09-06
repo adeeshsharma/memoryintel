@@ -47,6 +47,9 @@ Commands:
   update <plan.toon|->     Apply an update-plan (file path, or - for stdin)
   status                   Print a human-readable summary of current memory state
   check-stop               Stop-hook check: emit a JSON allow/block decision
+  sync                      Re-scan for stack/integration/deployment facts and write any new
+                            findings - runs automatically via load/check-stop; this is the
+                            manual/debugging entry point
   dashboard <enable|disable>  Turn the shared local dashboard on or off
   doctor [--force]         Refresh memoryintel's own generated files (instructions.md, pointer
                            blocks) to the current template wherever it's provably safe;

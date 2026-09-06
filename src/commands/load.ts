@@ -8,6 +8,7 @@ import { ensureDaemonRunning } from '../daemon/lifecycle.js';
 import { upsertRegistryEntry } from '../daemon/registry.js';
 import { appendEvent } from '../core/eventLog.js';
 import { readIndex } from '../core/memoryIndex.js';
+import { syncDetectedFacts } from '../core/factSync.js';
 
 const ALWAYS_LOAD = ['context/currentMentalModel.md', 'context/activeContext.md'];
 
@@ -75,6 +76,13 @@ export function runLoad(cwd: string, domain?: string): string {
 
   const root = findMemoryIntelRoot(cwd);
   if (!root) return '';
+
+  try {
+    syncDetectedFacts(root);
+  } catch {
+    // Best-effort, same policy as the daemon-registry call just below - auto-detection must
+    // never be the reason a session-start load fails.
+  }
 
   try {
     ensureDaemonRunning();

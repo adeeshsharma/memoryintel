@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCheckStop, resolveCheckStopMarker } from '../../src/adapters/claudeCode.js';
+import { runInit } from '../../src/commands/init.js';
 
 let projectRoot: string;
 let memoryRoot: string;
@@ -106,6 +107,33 @@ describe('runCheckStop', () => {
     commitAll(projectRoot, 'new work, committed promptly');
     const result = runCheckStop(memoryRoot);
     expect(result.decision).toBe('block');
+  });
+
+  it('names the specific detected fact in the block reason when the diff touches package.json', () => {
+    runInit(projectRoot);
+    initGitRepo(projectRoot);
+    writeFileSync(join(projectRoot, 'package.json'), JSON.stringify({ name: 'x', version: '1.0.0' }));
+    commitAll(projectRoot, 'initial');
+
+    writeFileSync(
+      join(projectRoot, 'package.json'),
+      JSON.stringify({ name: 'x', version: '1.0.0', dependencies: { next: '^14.0.0' } })
+    );
+
+    const result = runCheckStop(memoryRoot);
+    expect(result.decision).toBe('block');
+    expect(result.reason).toContain('technical/techContext.md');
+  });
+
+  it('does not mention detected facts in the reason when the diff does not touch a manifest file', () => {
+    runInit(projectRoot);
+    initGitRepo(projectRoot);
+    commitAll(projectRoot, 'initial');
+    writeFileSync(join(projectRoot, 'src.ts'), 'changed');
+
+    const result = runCheckStop(memoryRoot);
+    expect(result.decision).toBe('block');
+    expect(result.reason).not.toContain('technical/techContext.md');
   });
 });
 

@@ -1,8 +1,14 @@
 ## Deployment
+
+<!-- memoryintel:detected:start -->
+_No deployment signal found in repo._
+<!-- memoryintel:detected:end -->
+
 Not published to npm yet — see `business/roadmap.md` for that decision. Source is hosted at
 https://github.com/adeeshsharma/memory-intel (public); the only way to use this project today is
 still from source (clone, build, `npm link`) per README.md's local setup section, since nothing
 is published to a package registry.
+
 ## Hosting
 
 Not applicable — everything runs locally, per-machine. The dashboard daemon binds to loopback

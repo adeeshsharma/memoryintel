@@ -35,3 +35,6 @@
 {"timestamp":"2026-08-26T21:28:24.432Z","type":"memory-update","summary":"User-driven two-round redesign of scan/import, landing on judgment-vs-mechanical split as the resolving principle.","affectedFiles":["context/decisions.md"]}
 {"timestamp":"2026-08-26T21:28:24.433Z","type":"memory-update","summary":"Recording the final scope after rework, and the permanent scope boundary going forward.","affectedFiles":["business/roadmap.md"]}
 {"timestamp":"2026-08-26T21:28:24.434Z","type":"memory-update","summary":"Whole-file replace: scan/import redesigned twice this same cycle, previous mental-model snapshot already stale.","affectedFiles":["context/currentMentalModel.md"]}
+{"timestamp":"2026-09-06T13:40:15.006Z","type":"fact-sync","summary":"Auto-detected facts written to technical/techContext.md","affectedFiles":["technical/techContext.md"],"source":"auto-detect"}
+{"timestamp":"2026-09-06T13:40:15.007Z","type":"fact-sync","summary":"Auto-detected facts written to technical/integrations.md","affectedFiles":["technical/integrations.md"],"source":"auto-detect"}
+{"timestamp":"2026-09-06T13:40:15.008Z","type":"fact-sync","summary":"Auto-detected facts written to technical/infrastructure.md","affectedFiles":["technical/infrastructure.md"],"source":"auto-detect"}

@@ -16,15 +16,19 @@
     "summary": "Recording the final scope after rework, and the permanent scope boundary going forward."
   },
   "technical/infrastructure.md": {
-    "lastUpdated": "2026-08-23T10:02:28.171Z",
-    "summary": "CI now exists - this section described a real, acknowledged gap before"
+    "lastUpdated": "2026-09-06T13:40:15.007Z",
+    "summary": "Auto-detected stack/integration facts (memoryintel sync)"
   },
   "technical/techContext.md": {
-    "lastUpdated": "2026-08-23T10:02:28.172Z",
-    "summary": "CI now exists and is enforced via branch protection"
+    "lastUpdated": "2026-09-06T13:40:15.006Z",
+    "summary": "Auto-detected stack/integration facts (memoryintel sync)"
   },
   "context/decisions.md": {
     "lastUpdated": "2026-08-26T21:28:24.429Z",
     "summary": "User-driven two-round redesign of scan/import, landing on judgment-vs-mechanical split as the resolving principle."
+  },
+  "technical/integrations.md": {
+    "lastUpdated": "2026-09-06T13:40:15.007Z",
+    "summary": "Auto-detected stack/integration facts (memoryintel sync)"
   }
 }

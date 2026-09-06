@@ -1,5 +1,9 @@
 ## Stack
 
+<!-- memoryintel:detected:start -->
+- TypeScript — via `typescript` in package.json
+<!-- memoryintel:detected:end -->
+
 TypeScript, compiled with `tsc` to plain ESM (`"type": "module"` in `package.json`). Node.js ≥18.
 Vitest for tests. No runtime dependencies beyond Node's own built-ins — `dependencies` is empty in
 `package.json`; only `typescript`/`vitest`/`@types/node` as devDependencies.

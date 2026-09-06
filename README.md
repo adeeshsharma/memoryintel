@@ -122,6 +122,10 @@ If a shared local dashboard is running (a read-only view of every initialized pr
 machine), turn it off any time with `memoryintel dashboard disable` — or back on with
 `memoryintel dashboard enable`.
 
+`memoryintel sync` re-runs automatic stack/integration/deployment fact detection by hand (see
+"How it works" below) — useful for debugging, or to see what it found without waiting for the
+next `load`/`check-stop`.
+
 ## Prerequisites
 
 Node.js ≥18 — actually verified as the real floor (CI runs the full suite on Node 18), not an
@@ -138,6 +142,14 @@ prints the always-loaded files plus whichever technical/business/research domain
 an update-plan and calls `update()`, which validates it, writes atomically under a per-file lock,
 and logs the change — never a changelog, always a maintained understanding of the project as it
 currently is.
+
+A second, independent mechanism runs alongside the agent-driven one above: every `load` and
+`check-stop` call also auto-detects mechanically-verifiable stack, integration, and deployment
+facts (a dependency in `package.json`, a `vercel.json`, a `Dockerfile`) and writes them straight
+into `technical/techContext.md` / `integrations.md` / `infrastructure.md` — no agent judgment
+involved, no user action required. This is deliberately narrower than the agent-driven mechanism:
+it only ever asserts what it can prove from a file that's actually there. `memoryintel sync` runs
+the same detection by hand, for debugging.
 
 Full design docs live in `docs/superpowers/specs/`; a diagram-heavy architecture reference lives
 in `docs/architecture/memory-intel-architecture.html`. See `.memoryintel/context/decisions.md` in

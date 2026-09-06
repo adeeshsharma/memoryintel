@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.2.0...memoryintel-v1.3.0) (2026-09-06)
+
+
+### Features
+
+* skip check-stop blocking on trivial diffs ([#20](https://github.com/adeeshsharma/memoryintel/issues/20)) ([1aab70b](https://github.com/adeeshsharma/memoryintel/commit/1aab70b0e8591593761b1f8f57acac35e3fbd987))
+
 ## [1.2.0](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.1.4...memoryintel-v1.2.0) (2026-09-06)
 
 

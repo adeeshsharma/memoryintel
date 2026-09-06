@@ -110,6 +110,24 @@ export function decodeToonTable(text: string): Record<string, string>[] {
         `Malformed TOON table: row ${rowIndex} has ${values.length} field(s) but the header declares ${fields.length}.`
       );
     }
+    // TOON has no escape sequences at all - the only way to get a real line break into a field
+    // is an actual embedded newline character inside a quoted value (see quoteField). Typing the
+    // two characters '\' and 'n' instead (muscle memory from formats that do support \n) is a
+    // real, observed mistake: it isn't rejected by the CSV-style parser above, since backslash
+    // and 'n' are just ordinary characters to it, so it silently writes the literal text "\n"
+    // into a memory file instead of a line break. Catching only backslash-n (not \t or \r) keeps
+    // the false-positive surface small - a Windows-style path is common enough content to not
+    // risk rejecting (see the toon.test.ts case for exactly that).
+    values.forEach((value, fieldIndex) => {
+      if (value.includes('\\n')) {
+        throw new Error(
+          `Malformed TOON table: row ${rowIndex}'s "${fields[fieldIndex]}" field contains a literal ` +
+          `'\\n' (backslash followed by the letter n) instead of an actual newline. TOON has no escape ` +
+          `sequences - write a real line break inside the quoted field, or use the JSON plan format ` +
+          `instead, which does support \\n.`
+        );
+      }
+    });
     const row: Record<string, string> = {};
     fields.forEach((f, idx) => { row[f] = values[idx]; });
     return row;

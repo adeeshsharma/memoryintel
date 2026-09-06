@@ -273,7 +273,7 @@ cd memoryintel
 npm install
 npm run build                # compiles dist/, regenerates skills/memoryintel/SKILL.md from src/skill.ts
 npm link                     # makes `memoryintel` resolve to this exact checkout instead of the published one
-npm test                     # 207 tests, vitest
+npm test                     # 300 tests, vitest
 npm run build:skill:check    # fails if skills/memoryintel/SKILL.md has drifted from src/skill.ts
 ```
 

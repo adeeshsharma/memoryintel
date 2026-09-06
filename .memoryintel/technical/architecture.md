@@ -10,7 +10,7 @@ diagrams and sequence walkthroughs live in `docs/architecture/memory-intel-archi
 
 - **CLI** (`src/cli.ts` + `src/commands/*.ts`) — the only thing that touches disk. `init`, `load`,
   `update`, `status`, `check-stop`, `dashboard enable`/`disable`, `daemon start`.
-- **Skill** (`skills/memory-intel/SKILL.md`) — generated from `src/skill.ts`, which imports the
+- **Skill** (`skills/memoryintel/SKILL.md`) — generated from `src/skill.ts`, which imports the
   CLI's own `USAGE` string as its single source of truth (`npm run build` regenerates it;
   `npm run build:skill:check` detects drift).
 - **Plugin hooks** (`hooks/hooks.json`) — `SessionStart` runs `npx -y memoryintel load`; `Stop`
@@ -28,13 +28,20 @@ diagrams and sequence walkthroughs live in `docs/architecture/memory-intel-archi
 
 ## Data Flow
 
-`load()` reads the always-loaded content files (plus any requested domain files) → builds a TOON
-manifest (headings, line count, compression ceiling, over/under status) + concatenated content →
-this becomes `SessionStart`'s stdout, injected as context.
+`load()` reads the always-loaded content files, plus either an explicit `--domain` or (if none is
+given, which is all the `SessionStart` hook ever passes) whichever domain the most recent
+`update()` actually touched — auto-carried forward rather than left for the agent to notice and
+ask for. Domains not just loaded still get a heading-only index ("Other memory available") so
+they're at least visible. Builds a TOON manifest (headings, char count, compression ceiling in
+chars, over/under status) + concatenated content → this becomes `SessionStart`'s stdout, injected
+as context.
 
 An agent drafts a TOON update-plan → `update()` validates every row against current disk state,
-then writes atomically (temp-file + rename) under a file lock → logs to `memory-events.jsonl` and
-`memory-index.json` → resolves the check-stop marker to the diff signature at that moment.
+then writes atomically (temp-file + rename) under a lock scoped to only the files that plan
+actually touches (not the whole project — two `update()` calls on disjoint files run concurrently)
+→ flags a file that crosses its char ceiling in that same call (`overCeiling`, printed by the CLI)
+→ logs to `memory-events.jsonl` and `memory-index.json` → resolves the check-stop marker to the
+diff signature at that moment.
 
 ## Integrations
 

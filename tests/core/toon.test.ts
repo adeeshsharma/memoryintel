@@ -68,6 +68,30 @@ describe('encodeToonTable / decodeToonTable', () => {
     const malformed = 'items[2]{file,content}:\n  a.md,fine\n  b.md,"never closed\n';
     expect(() => decodeToonTable(malformed)).toThrow(/unterminated quoted field.*row 1/);
   });
+
+  it('throws on a field containing a literal backslash-n instead of an actual newline', () => {
+    // Real incident: TOON has no escape sequences, so typing the two characters '\' and 'n'
+    // (expecting it to become a newline, muscle memory from other formats) previously decoded
+    // as-is - a silent content-quality bug, not a crash - writing the literal text "\n" into a
+    // memory file instead of a real line break.
+    const malformed = 'items[1]{file,content}:\n  a.md,"line one\\nline two"\n';
+    expect(() => decodeToonTable(malformed)).toThrow(/literal.*\\n.*newline/);
+  });
+
+  it('names which row a literal backslash-n was found in', () => {
+    const malformed = 'items[2]{file,content}:\n  a.md,fine\n  b.md,"has\\nliteral"\n';
+    expect(() => decodeToonTable(malformed)).toThrow(/row 1/);
+  });
+
+  it('does not false-positive on an actual embedded newline (a real line break, not the two characters backslash-n)', () => {
+    const rows = [{ file: 'a.md', action: 'append', section: 'X', content: 'line one\nline two', reason: 'r' }];
+    expect(() => decodeToonTable(encodeToonTable(rows))).not.toThrow();
+  });
+
+  it('does not false-positive on unrelated backslash content, e.g. a Windows path', () => {
+    const text = 'items[1]{file,content}:\n  a.md,"C:\\Users\\Bob\\file.md"\n';
+    expect(() => decodeToonTable(text)).not.toThrow();
+  });
 });
 
 describe('decodePlanRows', () => {

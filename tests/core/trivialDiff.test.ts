@@ -72,8 +72,11 @@ function statusLinesFor(root: string): string[] {
 }
 
 describe('isTrivialDiff', () => {
-  it('is trivial when there are no changed files at all', () => {
-    expect(isTrivialDiff('/irrelevant', [], DEFAULT_CONFIG)).toBe(true);
+  it('is not trivial when there are no changed files at all (a commit landed on an otherwise-clean tree)', () => {
+    // A caller only reaches isTrivialDiff once the diff signature has already changed since the
+    // last flagged one - so an empty file list here means HEAD moved with nothing else dirty,
+    // i.e. a commit just landed. That must never be treated as trivial.
+    expect(isTrivialDiff('/irrelevant', [], DEFAULT_CONFIG)).toBe(false);
   });
 
   it('is never trivial when a manifest file is touched, even a 1-line change', () => {

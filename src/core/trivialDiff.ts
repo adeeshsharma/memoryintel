@@ -119,7 +119,12 @@ function countChangedLines(projectRoot: string, files: ChangedFile[]): number {
 // unclassifiable diff must reach the existing block behavior, not silently skip it.
 export function isTrivialDiff(projectRoot: string, statusLines: string[], config: TrivialDiffConfig): boolean {
   const files = parseStatusLines(statusLines);
-  if (files.length === 0) return true;
+  // A caller only reaches this function once the diff signature has already changed since the
+  // last flagged one (see runCheckStop) - so an empty file list here means the working tree
+  // itself is clean but HEAD moved, i.e. a commit just landed. That's exactly the scenario this
+  // hook exists to catch (work committed with memory never updated), so it must never be
+  // classified as trivial.
+  if (files.length === 0) return false;
 
   if (files.some((f) => MANIFEST_FILES.has(f.path))) return false;
 

@@ -24,4 +24,16 @@ describe('appendEvent', () => {
     expect(JSON.parse(lines[0]).type).toBe('architecture-change');
     expect(JSON.parse(lines[1]).summary).toBe('Milestone hit');
   });
+
+  it('accepts and round-trips an optional source field', () => {
+    appendEvent(eventsPath, {
+      timestamp: '2026-01-01T00:00:00.000Z',
+      type: 'fact-sync',
+      summary: 'test',
+      affectedFiles: ['technical/techContext.md'],
+      source: 'auto-detect'
+    });
+    const written = JSON.parse(readFileSync(eventsPath, 'utf-8').trim());
+    expect(written.source).toBe('auto-detect');
+  });
 });

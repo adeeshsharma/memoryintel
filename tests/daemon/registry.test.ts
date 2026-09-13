@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readRegistry, upsertRegistryEntry, detectToolsWired } from '../../src/daemon/registry.js';
+import { readRegistry, upsertRegistryEntry, detectToolsWired, pruneRegistry, pruneRegistryFile } from '../../src/daemon/registry.js';
 import { writeGlobalSettings } from '../../src/daemon/settings.js';
 
 let globalDir: string;
@@ -64,6 +64,7 @@ describe('upsertRegistryEntry / readRegistry', () => {
   });
 
   it('preserves initializedAt but bumps lastSessionAt and re-detects tools on a later upsert', async () => {
+    mkdirSync(join(projectRoot, '.memoryintel'), { recursive: true });
     upsertRegistryEntry(projectRoot);
     const first = readRegistry()[projectRoot];
 
@@ -82,5 +83,51 @@ describe('upsertRegistryEntry / readRegistry', () => {
     writeGlobalSettings({ dashboardEnabled: false });
     upsertRegistryEntry(projectRoot);
     expect(readRegistry()[projectRoot]).toBeUndefined();
+  });
+
+  it('prunes a stale entry (its .memoryintel is gone) as a side effect of any upsert', () => {
+    const staleProject = mkdtempSync(join(tmpdir(), 'mi-registry-stale-'));
+    mkdirSync(join(staleProject, '.memoryintel'), { recursive: true });
+    upsertRegistryEntry(staleProject);
+    rmSync(staleProject, { recursive: true, force: true });
+
+    upsertRegistryEntry(projectRoot);
+
+    const registry = readRegistry();
+    expect(registry[staleProject]).toBeUndefined();
+    expect(registry[projectRoot]).toBeDefined();
+  });
+});
+
+describe('pruneRegistry', () => {
+  it('keeps only entries whose path still has a .memoryintel directory', () => {
+    mkdirSync(join(projectRoot, '.memoryintel'), { recursive: true });
+    const dead = join(tmpdir(), 'mi-registry-never-existed-xyz');
+    const registry = {
+      [projectRoot]: { path: projectRoot, initializedAt: 'x', lastSessionAt: 'x', toolsWired: [] },
+      [dead]: { path: dead, initializedAt: 'x', lastSessionAt: 'x', toolsWired: [] }
+    };
+    expect(Object.keys(pruneRegistry(registry))).toEqual([projectRoot]);
+  });
+});
+
+describe('pruneRegistryFile', () => {
+  it('removes stale entries from disk and returns their paths', () => {
+    const staleProject = mkdtempSync(join(tmpdir(), 'mi-registry-stale2-'));
+    mkdirSync(join(staleProject, '.memoryintel'), { recursive: true });
+    upsertRegistryEntry(staleProject);
+    rmSync(staleProject, { recursive: true, force: true });
+
+    const removed = pruneRegistryFile();
+
+    expect(removed).toEqual([staleProject]);
+    expect(readRegistry()[staleProject]).toBeUndefined();
+  });
+
+  it('returns an empty array and leaves the registry untouched when nothing is stale', () => {
+    mkdirSync(join(projectRoot, '.memoryintel'), { recursive: true });
+    upsertRegistryEntry(projectRoot);
+    expect(pruneRegistryFile()).toEqual([]);
+    expect(readRegistry()[projectRoot]).toBeDefined();
   });
 });

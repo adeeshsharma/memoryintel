@@ -12,7 +12,7 @@ import { runScan } from './commands/scan.js';
 import { runCheckStop } from './adapters/claudeCode.js';
 import { runDashboardEnable, runDashboardDisable } from './commands/dashboardToggle.js';
 import { runDaemonStart } from './commands/daemonStart.js';
-import { runDoctor } from './commands/doctor.js';
+import { runDoctor, runDoctorAll } from './commands/doctor.js';
 import { syncDetectedFacts } from './core/factSync.js';
 
 // Every command below that resolves .memoryintel/ by walking up from a starting directory
@@ -45,6 +45,7 @@ export interface DispatchResult {
 export const USAGE = `Usage: memoryintel <command> [options]
 
 Commands:
+  --version, version       Print the installed package version
   init [path]              Initialize .memoryintel/ in the current or given directory
   scan [path]              Print a quick, no-LLM digest of an existing codebase's stack and
                            top-level layout - orientation only, not architecture
@@ -61,17 +62,36 @@ Commands:
   doctor [--force]         Refresh memoryintel's own generated files (instructions.md, pointer
                            blocks) to the current template wherever it's provably safe;
                            --force also overwrites instructions.md when it isn't
+  doctor --all [--force]   Same, for every project in the registry (~/.memoryintel/registry.json)
+                           in one call - also prunes registry entries whose .memoryintel is gone
   daemon start              Run the dashboard daemon in the foreground (usually auto-started)
 
 An update-plan row may set kind=compress to compact an oversized section; update() only applies
 such a row when its target file is currently git-clean.
 `;
 
+// Reads this package's own version straight from package.json, next to the compiled dist/ this
+// module runs from - no network call. `npm view memoryintel version` (or a real update-notifier
+// setup) is the deliberately-skipped auto-check: `doctor` already runs dozens of times across
+// this project's own test suite, and a network call there would make every one of those flaky
+// under a blocked-network CI sandbox for a "nice to know" that's only ever relevant once every
+// few weeks. This --version flag is the honest, zero-risk substitute - it just answers "what do I
+// have" on demand, same as any other CLI, and leaves "is a newer one out" to an explicit,
+// deliberate check the user already knows how to run.
+function getVersion(): string {
+  const packageJsonPath = new URL('../package.json', import.meta.url);
+  return JSON.parse(readFileSync(packageJsonPath, 'utf-8')).version;
+}
+
 export function dispatch(argv: string[]): DispatchResult {
   const [command] = argv;
 
   if (!command) {
     return { exitCode: 0, stdout: USAGE, stderr: '' };
+  }
+
+  if (command === '--version' || command === 'version') {
+    return { exitCode: 0, stdout: `${getVersion()}\n`, stderr: '' };
   }
 
   switch (command) {
@@ -111,9 +131,17 @@ export function dispatch(argv: string[]): DispatchResult {
       return { exitCode: 0, stdout, stderr: '' };
     }
     case 'doctor': {
+      const force = argv.includes('--force');
+      if (argv.includes('--all')) {
+        const { removedFromRegistry, perProject } = runDoctorAll({ force });
+        const prunedLine = removedFromRegistry.length > 0
+          ? `Pruned ${removedFromRegistry.length} stale registry entr${removedFromRegistry.length === 1 ? 'y' : 'ies'}: ${removedFromRegistry.join(', ')}\n\n`
+          : '';
+        const projectSections = perProject.map((p) => `=== ${p.path} ===\n${p.report}`).join('\n');
+        return { exitCode: 0, stdout: `${prunedLine}${projectSections}`, stderr: '' };
+      }
       const root = findMemoryIntelRoot(resolveStartDir(argv));
       if (!root) return { exitCode: 1, stdout: '', stderr: 'No .memoryintel/ found.\n' };
-      const force = argv.includes('--force');
       return { exitCode: 0, stdout: runDoctor(root, { force }), stderr: '' };
     }
     case 'dashboard': {

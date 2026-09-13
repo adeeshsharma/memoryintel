@@ -1,15 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dispatch } from '../src/cli.js';
 import { runInit } from '../src/commands/init.js';
+import { upsertRegistryEntry } from '../src/daemon/registry.js';
 
 describe('cli dispatch', () => {
   it('returns a usage message and exit code 1 for an unknown command', () => {
     const result = dispatch(['unknown-command']);
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toContain('Usage: memoryintel');
+  });
+
+  it('--version and version both print the installed package version, no network call', () => {
+    const version = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8')).version;
+    expect(dispatch(['--version']).stdout.trim()).toBe(version);
+    expect(dispatch(['version']).stdout.trim()).toBe(version);
   });
 
   it('returns exit code 0 and usage for no command', () => {
@@ -55,6 +62,31 @@ describe('cli dispatch', () => {
     } finally {
       process.chdir(originalCwd);
       rmSync(projectDir, { recursive: true, force: true });
+    }
+  });
+
+  it('doctor --all runs doctor against every registered project, no cwd/--root needed', () => {
+    const globalDir = mkdtempSync(join(tmpdir(), 'mi-cli-doctor-all-global-'));
+    const projectA = mkdtempSync(join(tmpdir(), 'mi-cli-doctor-all-a-'));
+    const projectB = mkdtempSync(join(tmpdir(), 'mi-cli-doctor-all-b-'));
+    process.env.MEMORYINTEL_GLOBAL_DIR = globalDir;
+    try {
+      runInit(projectA);
+      runInit(projectB);
+      upsertRegistryEntry(projectA);
+      upsertRegistryEntry(projectB);
+
+      const result = dispatch(['doctor', '--all']);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(projectA);
+      expect(result.stdout).toContain(projectB);
+      expect(result.stdout).toContain('instructions.md: up to date');
+    } finally {
+      delete process.env.MEMORYINTEL_GLOBAL_DIR;
+      rmSync(globalDir, { recursive: true, force: true });
+      rmSync(projectA, { recursive: true, force: true });
+      rmSync(projectB, { recursive: true, force: true });
     }
   });
 

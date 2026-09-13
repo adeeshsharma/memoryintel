@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInit } from '../../src/commands/init.js';
-import { runDoctor } from '../../src/commands/doctor.js';
+import { runDoctor, runDoctorAll } from '../../src/commands/doctor.js';
 import { setGeneratedFileHash, getGeneratedFileHash, hashContent } from '../../src/core/generatedFileHashes.js';
 import { INSTRUCTIONS_TEMPLATE } from '../../src/commands/init.js';
+import { upsertRegistryEntry, readRegistry } from '../../src/daemon/registry.js';
 
 let projectDir: string;
 let root: string;
@@ -50,6 +52,18 @@ describe('runDoctor - instructions.md', () => {
     expect(readFileSync(join(root, 'instructions.md'), 'utf-8')).toBe('# Hand-edited\nSomething the user wrote.\n');
     expect(existsSync(join(root, 'instructions.md.new'))).toBe(true);
     expect(readFileSync(join(root, 'instructions.md.new'), 'utf-8')).toBe(INSTRUCTIONS_TEMPLATE);
+  });
+
+  it('reports a line-count stat for both sides, so the scale of the difference is visible without a separate diff command', () => {
+    runInit(projectDir);
+    const staleContent = '# Old\nline1\nline2\n';
+    writeFileSync(join(root, 'instructions.md'), staleContent);
+
+    const report = runDoctor(root);
+
+    const templateLines = INSTRUCTIONS_TEMPLATE.split('\n').length;
+    expect(report).toContain(`current: ${staleContent.split('\n').length} lines`);
+    expect(report).toContain(`template: ${templateLines} lines`);
   });
 
   it('a project with no generatedFileHashes key at all, but content already pristine, reports up to date', () => {
@@ -143,5 +157,100 @@ describe('runDoctor - pointer blocks', () => {
     const before = readFileSync(mentalModelPath, 'utf-8');
     runDoctor(root, { force: true });
     expect(readFileSync(mentalModelPath, 'utf-8')).toBe(before);
+  });
+});
+
+function initGitRepo(dir: string): void {
+  execFileSync('git', ['init', '-q'], { cwd: dir });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
+  execFileSync('git', ['config', 'user.name', 'Test'], { cwd: dir });
+}
+
+describe('runDoctor - git tracking of .memoryintel', () => {
+  it('warns when .memoryintel has never been committed at all (the real worktree gap)', () => {
+    initGitRepo(projectDir);
+    runInit(projectDir);
+
+    const report = runDoctor(root);
+
+    expect(report).toMatch(/\.memoryintel\/.*entirely untracked/);
+  });
+
+  it('says nothing once .memoryintel has been committed', () => {
+    initGitRepo(projectDir);
+    runInit(projectDir);
+    execFileSync('git', ['add', '-A'], { cwd: projectDir });
+    execFileSync('git', ['commit', '-q', '-m', 'init memory'], { cwd: projectDir });
+
+    const report = runDoctor(root);
+
+    expect(report).not.toContain('untracked');
+  });
+
+  it('says nothing when the project is not a git repository at all - cannot verify, stays silent', () => {
+    runInit(projectDir);
+    const report = runDoctor(root);
+    expect(report).not.toContain('untracked');
+  });
+});
+
+describe('runDoctorAll', () => {
+  let globalDir: string;
+  let projectB: string;
+
+  beforeEach(() => {
+    globalDir = mkdtempSync(join(tmpdir(), 'mi-doctor-all-global-'));
+    process.env.MEMORYINTEL_GLOBAL_DIR = globalDir;
+    projectB = mkdtempSync(join(tmpdir(), 'mi-doctor-all-b-'));
+  });
+  afterEach(() => {
+    rmSync(globalDir, { recursive: true, force: true });
+    rmSync(projectB, { recursive: true, force: true });
+    delete process.env.MEMORYINTEL_GLOBAL_DIR;
+  });
+
+  it('runs doctor against every registered project', () => {
+    runInit(projectDir);
+    runInit(projectB);
+    upsertRegistryEntry(projectDir);
+    upsertRegistryEntry(projectB);
+
+    const result = runDoctorAll();
+
+    const paths = result.perProject.map((p) => p.path).sort();
+    expect(paths).toEqual([projectB, projectDir].sort());
+    expect(result.perProject.find((p) => p.path === projectDir)?.report).toContain('instructions.md: up to date');
+  });
+
+  it('prunes stale registry entries before running, and reports what it removed', () => {
+    const staleProject = mkdtempSync(join(tmpdir(), 'mi-doctor-all-stale-'));
+    runInit(staleProject);
+    runInit(projectDir);
+    // Both registered while both still exist - upsertRegistryEntry() itself prunes on every
+    // call, so registering projectDir AFTER deleting staleProject would already self-heal this
+    // before runDoctorAll ever got a chance to. Only deleting staleProject's directory *after*
+    // both are registered, with no upsert in between, actually leaves it stale for runDoctorAll
+    // itself to catch.
+    upsertRegistryEntry(staleProject);
+    upsertRegistryEntry(projectDir);
+    rmSync(staleProject, { recursive: true, force: true });
+
+    const result = runDoctorAll();
+
+    expect(result.removedFromRegistry).toEqual([staleProject]);
+    expect(result.perProject.map((p) => p.path)).toEqual([projectDir]);
+    expect(readRegistry()[staleProject]).toBeUndefined();
+  });
+
+  it('passes --force through to every project', () => {
+    runInit(projectDir);
+    const staleContent = '# Old, hand-edited-looking instructions\n';
+    writeFileSync(join(root, 'instructions.md'), staleContent);
+    upsertRegistryEntry(projectDir);
+
+    const result = runDoctorAll({ force: true });
+
+    expect(result.perProject[0].report).toContain('refreshed (forced)');
+    expect(readFileSync(join(root, 'instructions.md'), 'utf-8')).toBe(INSTRUCTIONS_TEMPLATE);
   });
 });

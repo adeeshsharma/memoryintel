@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.3.1...memoryintel-v1.3.2) (2026-09-13)
+
+
+### Bug Fixes
+
+* surface load's silent writes and ease currentMentalModel friction ([#24](https://github.com/adeeshsharma/memoryintel/issues/24)) ([5d0e407](https://github.com/adeeshsharma/memoryintel/commit/5d0e407fe5968de60ea015b63d70441ec1374c64))
+
 ## [1.3.1](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.3.0...memoryintel-v1.3.1) (2026-09-06)
 
 

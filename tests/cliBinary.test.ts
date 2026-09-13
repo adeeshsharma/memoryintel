@@ -40,6 +40,12 @@ describe('built binary: piped stdout is never truncated', () => {
       const activeContext = `## Current Focus\n${filler}\nEND-OF-CONTEXT-SENTINEL\n`;
       writeFileSync(join(projectDir, '.memoryintel', 'context', 'activeContext.md'), activeContext);
 
+      // A cold project's first-ever `load` bootstraps the auto-detected-facts blocks (a real,
+      // one-time write load's own output now reports - see load.ts's "Auto-detected facts
+      // refreshed" line) - settle that here so the three comparable invocations below only ever
+      // differ by transport (redirected/piped/direct), never by this one-time content change.
+      run(['load']);
+
       // Baseline: capture the output where truncation cannot happen (child writes to a file).
       const outFile = join(projectDir, 'out.txt');
       const redirected = spawnSync(

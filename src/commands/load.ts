@@ -77,8 +77,12 @@ export function runLoad(cwd: string, domain?: string): string {
   const root = findMemoryIntelRoot(cwd);
   if (!root) return '';
 
+  // Captured so the caller can see it happened - `load` mutating disk with zero acknowledgment
+  // in its own output meant an agent could only discover this later via an unrelated-looking
+  // `git status`, out of context and easy to mistake for something it did itself.
+  let detectedFactsWritten: string[] = [];
   try {
-    syncDetectedFacts(root);
+    detectedFactsWritten = syncDetectedFacts(root).written;
   } catch {
     // Best-effort, same policy as the daemon-registry call just below - auto-detection must
     // never be the reason a session-start load fails.
@@ -177,11 +181,25 @@ export function runLoad(cwd: string, domain?: string): string {
     // KPI telemetry is best-effort - never let logging a load break the load itself.
   }
 
+  // A dedicated line, not just the manifest's per-row `status` column - a value buried in one
+  // column of a multi-column table is easy to skim past among everything else `load` prints,
+  // unlike `update`'s own over-ceiling line (printed standalone, right after the write that
+  // caused it). This closes that same gap at session start, the one moment every session is
+  // guaranteed to see it.
+  const overCeilingFiles = manifestRows.filter((r) => r.status === 'over').map((r) => r.file);
+  const overCeilingLine = overCeilingFiles.length > 0
+    ? `\nOver ceiling, consider compacting: ${overCeilingFiles.join(', ')}`
+    : '';
+
+  const detectedFactsLine = detectedFactsWritten.length > 0
+    ? `\nAuto-detected facts refreshed: ${detectedFactsWritten.join(', ')}`
+    : '';
+
   const manifest = encodeToonTable(manifestRows);
   // A leading, plainly-labeled root line - silently loading the wrong project's (or wrong
   // worktree/branch's) memory has happened in practice: findMemoryIntelRoot() walks up from
   // cwd with no built-in visibility into which root it actually found, so confidently-wrong
   // content came back with nothing to flag it. This is always the first thing printed,
   // whether or not --domain is given.
-  return `root: ${root}\n${manifest}${domainIndex}\n${sections.join('\n')}`;
+  return `root: ${root}\n${manifest}${overCeilingLine}${detectedFactsLine}${domainIndex}\n${sections.join('\n')}`;
 }

@@ -81,8 +81,11 @@ format is preferred - use whichever you're less likely to get wrong.
 Also include a row for \`context/currentMentalModel.md\` whenever the update is more than a small,
 localized fact — anything that shifts what the project *is* or where it currently stands (not
 every single decision/progress entry needs one). Unlike every other file, it is a **whole-file
-replace**: rewrite the entire current-understanding narrative from scratch each time, in plain
-prose, not another append-only log. This is the file the dashboard's "Current understanding"
+replace**: submit the file's complete new content each time, not a diff or an append. "Whole-file"
+describes the wire format, not how much work it is to produce - start from the copy \`load\` already
+gave you this session, keep whatever is still accurate, and rewrite only the parts that changed.
+The result should read as one coherent narrative in plain prose, not an append-only log stitched
+together from old and new fragments. This is the file the dashboard's "Current understanding"
 section renders directly — a stale or never-written one is the single most common way this
 project's memory looks broken to a human glancing at the dashboard, even when every other file is
 being updated correctly.

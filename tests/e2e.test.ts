@@ -59,6 +59,11 @@ describe('end-to-end: init -> load -> update -> load -> status', () => {
 
   it('leaves everything untouched when the agent has nothing meaningful to report (no update call)', () => {
     runInit(projectDir);
+    // The very first load bootstraps the auto-detected-facts blocks (technical/techContext.md
+    // etc.) from nothing - a real, one-time write that load's own output now reports (see
+    // load.ts's "Auto-detected facts refreshed" line). That bootstrap, not a lack of
+    // idempotency, is what the discarded call below settles before the actual comparison.
+    runLoad(projectDir);
     const before = runLoad(projectDir);
     const after = runLoad(projectDir);
     expect(after).toBe(before);

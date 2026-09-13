@@ -90,6 +90,31 @@ describe('runLoad', () => {
     expect(output).toContain('under');
     expect(output).not.toContain(',over');
   });
+
+  it('adds an explicit summary line naming files over their ceiling, not just the manifest status column', () => {
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingChars: 5 } }));
+    const output = runLoad(base);
+    expect(output).toMatch(/Over ceiling, consider compacting: .*context\/currentMentalModel\.md/);
+  });
+
+  it('says nothing about ceilings when every loaded file is under it', () => {
+    writeFileSync(join(root, 'memory-config.json'), JSON.stringify({ compression: { defaultCeilingChars: 100000 } }));
+    const output = runLoad(base);
+    expect(output).not.toContain('Over ceiling');
+  });
+});
+
+describe('runLoad auto-detected facts', () => {
+  it('reports which files were just refreshed with auto-detected facts, so a later git status is not a surprise', () => {
+    runInit(base);
+    const output = runLoad(base);
+    expect(output).toMatch(/Auto-detected facts refreshed.*technical\/techContext\.md/);
+  });
+
+  it('says nothing about auto-detected facts when the fact-sync targets do not exist on this project', () => {
+    const output = runLoad(base);
+    expect(output).not.toContain('Auto-detected facts');
+  });
 });
 
 describe('runLoad domain index', () => {

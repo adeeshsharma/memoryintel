@@ -38,6 +38,7 @@ Read `.memoryintel/instructions.md` first — it is the authoritative, per-proje
 Usage: memoryintel <command> [options]
 
 Commands:
+  --version, version       Print the installed package version
   init [path]              Initialize .memoryintel/ in the current or given directory
   scan [path]              Print a quick, no-LLM digest of an existing codebase's stack and
                            top-level layout - orientation only, not architecture
@@ -54,6 +55,8 @@ Commands:
   doctor [--force]         Refresh memoryintel's own generated files (instructions.md, pointer
                            blocks) to the current template wherever it's provably safe;
                            --force also overwrites instructions.md when it isn't
+  doctor --all [--force]   Same, for every project in the registry (~/.memoryintel/registry.json)
+                           in one call - also prunes registry entries whose .memoryintel is gone
   daemon start              Run the dashboard daemon in the foreground (usually auto-started)
 
 An update-plan row may set kind=compress to compact an oversized section; update() only applies

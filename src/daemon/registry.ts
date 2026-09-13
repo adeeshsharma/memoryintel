@@ -57,10 +57,33 @@ function writeRegistry(registry: Record<string, RegistryEntry>): void {
   writeFileSync(registryPath(), JSON.stringify(registry, null, 2) + '\n');
 }
 
+// Registered projects accumulate forever otherwise - a moved/deleted project, a one-off temp
+// test fixture, or an untouched-since worktree all stay listed with no signal they're dead.
+// `.memoryintel` (not just the bare project path) is the actual existence check, since the
+// project directory can survive even after someone deletes just its memory.
+export function pruneRegistry(registry: Record<string, RegistryEntry>): Record<string, RegistryEntry> {
+  const pruned: Record<string, RegistryEntry> = {};
+  for (const [path, entry] of Object.entries(registry)) {
+    if (existsSync(join(path, '.memoryintel'))) pruned[path] = entry;
+  }
+  return pruned;
+}
+
+// The disk-level counterpart of pruneRegistry() - used both as doctor --all's own cleanup step
+// (see commands/doctor.ts) and, via upsertRegistryEntry() below, self-healing on every ordinary
+// load/update/doctor call, so the registry never needs a dedicated "clean it up" reminder.
+export function pruneRegistryFile(): string[] {
+  const registry = readRegistry();
+  const kept = pruneRegistry(registry);
+  const removed = Object.keys(registry).filter((path) => !(path in kept));
+  if (removed.length > 0) writeRegistry(kept);
+  return removed;
+}
+
 export function upsertRegistryEntry(projectRoot: string): void {
   if (!readGlobalSettings().dashboardEnabled) return;
 
-  const registry = readRegistry();
+  const registry = pruneRegistry(readRegistry());
   const now = new Date().toISOString();
   const existing = registry[projectRoot];
 

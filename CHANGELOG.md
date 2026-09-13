@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.3.2...memoryintel-v1.4.0) (2026-09-13)
+
+
+### Features
+
+* doctor --all, registry pruning, untracked-.memoryintel warning, --version ([#27](https://github.com/adeeshsharma/memoryintel/issues/27)) ([a9a5b53](https://github.com/adeeshsharma/memoryintel/commit/a9a5b536667fcd2aa3579b5d7627528c19872e57))
+
 ## [1.3.2](https://github.com/adeeshsharma/memoryintel/compare/memoryintel-v1.3.1...memoryintel-v1.3.2) (2026-09-13)
 
 
